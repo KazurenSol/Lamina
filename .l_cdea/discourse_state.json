@@ -4,6 +4,65 @@
     {
       "provenance": [
         {
+          "chunk_id": "chunk_79d22142",
+          "confidence": 0.75,
+          "extraction_method": "relationship_extractor",
+          "location": "line:2",
+          "source_id": "tmp_it_sn78",
+          "source_path": "/tmp/tmp_it_sn78.txt",
+          "source_type": "document",
+          "timestamp_index": 2,
+          "trace_id": "tr_fae307e0d113"
+        }
+      ],
+      "relation_type": "depends_on",
+      "salience": 0.75,
+      "source_id": "dn_455c284f07d88eb0",
+      "target_id": "dn_b4b6d07e43ed3a14"
+    },
+    {
+      "provenance": [
+        {
+          "chunk_id": "chunk_79d22142",
+          "confidence": 0.75,
+          "extraction_method": "relationship_extractor",
+          "location": "line:2",
+          "source_id": "tmp_it_sn78",
+          "source_path": "/tmp/tmp_it_sn78.txt",
+          "source_type": "document",
+          "timestamp_index": 2,
+          "trace_id": "tr_fae307e0d113"
+        }
+      ],
+      "relation_type": "depends_on",
+      "salience": 0.75,
+      "source_id": "dn_455c284f07d88eb0",
+      "target_id": "dn_cc8816f354cde030"
+    },
+    {
+      "provenance": [],
+      "relation_type": "Entity",
+      "salience": 1.0,
+      "source_id": "dn_95e71ee4b6ef7a3b",
+      "target_id": "dn_49d34c3a6617a527"
+    },
+    {
+      "provenance": [],
+      "relation_type": "Entity",
+      "salience": 1.0,
+      "source_id": "dn_95e71ee4b6ef7a3b",
+      "target_id": "dn_4b88509552e3e001"
+    },
+    {
+      "provenance": [],
+      "relation_type": "Relation",
+      "salience": 1.0,
+      "source_id": "dn_9a65bbef8ee3e54e",
+      "target_id": "dn_49d34c3a6617a527"
+    },
+    {
+      "provenance": [
+        {
           "chunk_id": "chunk_8928e571",
           "confidence": 0.75,
           "extraction_method": "relationship_extractor",
@@ -13,6 +72,17 @@
           "source_type": "document",
           "timestamp_index": 1,
           "trace_id": "tr_b8607bbfbbcc"
+        },
+        {
+          "chunk_id": "chunk_9ff4a30a",
+          "confidence": 0.75,
+          "extraction_method": "relationship_extractor",
+          "location": "line:1",
+          "source_id": "tmp_it_sn78",
+          "source_path": "/tmp/tmp_it_sn78.txt",
+          "source_type": "document",
+          "timestamp_index": 1,
+          "trace_id": "tr_7b3489ad41a4"
         }
       ],
       "relation_type": "depends_on",
@@ -32,25 +102,72 @@
           "source_type": "document",
           "timestamp_index": 3,
           "trace_id": "tr_37a612efc80c"
+        },
+        {
+          "chunk_id": "chunk_fe8f643c",
+          "confidence": 0.75,
+          "extraction_method": "relationship_extractor",
+          "location": "line:4",
+          "source_id": "tmp_it_sn78",
+          "source_path": "/tmp/tmp_it_sn78.txt",
+          "source_type": "document",
+          "timestamp_index": 4,
+          "trace_id": "tr_beca44827c1c"
         }
       ],
       "relation_type": "is_a",
       "salience": 0.75,
       "source_id": "dn_cc8816f354cde030",
       "target_id": "dn_1ee062559be03a85"
+    },
+    {
+      "provenance": [],
+      "relation_type": "Process",
+      "salience": 1.0,
+      "source_id": "dn_d8371119ec1849b6",
+      "target_id": "dn_4b88509552e3e001"
+    },
+    {
+      "provenance": [
+        {
+          "chunk_id": "chunk_47eb5f36",
+          "confidence": 0.75,
+          "extraction_method": "relationship_extractor",
+          "location": "line:3",
+          "source_id": "tmp_it_sn78",
+          "source_path": "/tmp/tmp_it_sn78.txt",
+          "source_type": "document",
+          "timestamp_index": 3,
+          "trace_id": "tr_3075e008dfb0"
+        }
+      ],
+      "relation_type": "is_a",
+      "salience": 0.75,
+      "source_id": "dn_eb55fb797e34c000",
+      "target_id": "dn_b309e2941b4174e1"
     }
   ],
   "metadata": {
     "planner_cache": {},
     "salience_index": {
-      "dn_1ee062559be03a85": 0.5,
-      "dn_245809cce80d41c0": 1.0,
-      "dn_a25ad731188519aa": 1.0,
-      "dn_b4b6d07e43ed3a14": 0.5,
-      "dn_cc8816f354cde030": 0.5,
-      "dn_eb55fb797e34c000": 0.5
+      "dn_1ee062559be03a85": 0.475,
+      "dn_245809cce80d41c0": 0.95,
+      "dn_4132f3a73554bfb7": 0.95,
+      "dn_455c284f07d88eb0": 0.5,
+      "dn_49d34c3a6617a527": 0.95,
+      "dn_4b88509552e3e001": 0.95,
+      "dn_95e71ee4b6ef7a3b": 0.9974999999999999,
+      "dn_9a65bbef8ee3e54e": 0.76,
+      "dn_a25ad731188519aa": 0.95,
+      "dn_b309e2941b4174e1": 0.5,
+      "dn_b4b6d07e43ed3a14": 0.475,
+      "dn_bbe2ab8fb187401b": 1.0,
+      "dn_cc8816f354cde030": 0.475,
+      "dn_d8371119ec1849b6": 0.76,
+      "dn_eb55fb797e34c000": 0.475,
+      "dn_f7a4e9014be63a85": 1.0
     },
-    "temporal_index": 0
+    "temporal_index": 1
   },
   "nodes": [
     {
@@ -74,7 +191,7 @@
           "trace_id": "tr_37a612efc80c"
         }
       ],
-      "salience": 0.5,
+      "salience": 0.475,
       "semantic_type": "Entity",
       "updated_at": 0,
       "value": "amount of matter in an object"
@@ -107,10 +224,170 @@
           "trace_id": "tr_9b44f5149581"
         }
       ],
-      "salience": 1.0,
+      "salience": 0.95,
       "semantic_type": "Entity",
       "updated_at": 3,
       "value": "Mass is the amount of matter in an object."
+    },
+    {
+      "canonical_signature": null,
+      "created_at": 0,
+      "id": "dn_4132f3a73554bfb7",
+      "metadata": {},
+      "provenance": [
+        {
+          "chunk_id": null,
+          "confidence": 1.0,
+          "extraction_method": "_generic_Abstraction_1in",
+          "location": null,
+          "source_id": "_generic_Abstraction_1in",
+          "source_path": null,
+          "source_type": "execution",
+          "timestamp_index": 0,
+          "trace_id": "tr_b09553d8a302"
+        }
+      ],
+      "salience": 0.95,
+      "semantic_type": "Abstraction",
+      "updated_at": 0,
+      "value": [
+        "what"
+      ]
+    },
+    {
+      "canonical_signature": null,
+      "created_at": 1,
+      "id": "dn_455c284f07d88eb0",
+      "metadata": {
+        "category": "relationship_term",
+        "term": "force"
+      },
+      "provenance": [
+        {
+          "chunk_id": "chunk_79d22142",
+          "confidence": 0.75,
+          "extraction_method": "relationship_extractor",
+          "location": "line:2",
+          "source_id": "tmp_it_sn78",
+          "source_path": "/tmp/tmp_it_sn78.txt",
+          "source_type": "document",
+          "timestamp_index": 2,
+          "trace_id": "tr_fae307e0d113"
+        }
+      ],
+      "salience": 0.5,
+      "semantic_type": "Entity",
+      "updated_at": 1,
+      "value": "force"
+    },
+    {
+      "canonical_signature": null,
+      "created_at": 0,
+      "id": "dn_49d34c3a6617a527",
+      "metadata": {},
+      "provenance": [
+        {
+          "chunk_id": null,
+          "confidence": 1.0,
+          "extraction_method": "_generic_State_2in",
+          "location": null,
+          "source_id": "_generic_State_2in",
+          "source_path": null,
+          "source_type": "execution",
+          "timestamp_index": 0,
+          "trace_id": "tr_b5f5d344f76b"
+        }
+      ],
+      "salience": 0.95,
+      "semantic_type": "State",
+      "updated_at": 0,
+      "value": [
+        "what",
+        "don't"
+      ]
+    },
+    {
+      "canonical_signature": null,
+      "created_at": 0,
+      "id": "dn_4b88509552e3e001",
+      "metadata": {},
+      "provenance": [
+        {
+          "chunk_id": null,
+          "confidence": 1.0,
+          "extraction_method": "_generic_Event_2in",
+          "location": null,
+          "source_id": "_generic_Event_2in",
+          "source_path": null,
+          "source_type": "execution",
+          "timestamp_index": 0,
+          "trace_id": "tr_00d21a9ebe59"
+        }
+      ],
+      "salience": 0.95,
+      "semantic_type": "Event",
+      "updated_at": 0,
+      "value": [
+        "what",
+        "don't"
+      ]
+    },
+    {
+      "canonical_signature": null,
+      "created_at": 0,
+      "id": "dn_95e71ee4b6ef7a3b",
+      "metadata": {},
+      "provenance": [
+        {
+          "chunk_id": null,
+          "confidence": 1.0,
+          "extraction_method": "_generic_Event_2in",
+          "location": null,
+          "source_id": "_generic_Event_2in",
+          "source_path": null,
+          "source_type": "execution",
+          "timestamp_index": 0,
+          "trace_id": "tr_00d21a9ebe59"
+        },
+        {
+          "chunk_id": null,
+          "confidence": 1.0,
+          "extraction_method": "_generic_State_2in",
+          "location": null,
+          "source_id": "_generic_State_2in",
+          "source_path": null,
+          "source_type": "execution",
+          "timestamp_index": 0,
+          "trace_id": "tr_b5f5d344f76b"
+        }
+      ],
+      "salience": 0.9974999999999999,
+      "semantic_type": "Entity",
+      "updated_at": 0,
+      "value": "what"
+    },
+    {
+      "canonical_signature": null,
+      "created_at": 0,
+      "id": "dn_9a65bbef8ee3e54e",
+      "metadata": {},
+      "provenance": [
+        {
+          "chunk_id": null,
+          "confidence": 1.0,
+          "extraction_method": "_generic_State_2in",
+          "location": null,
+          "source_id": "_generic_State_2in",
+          "source_path": null,
+          "source_type": "execution",
+          "timestamp_index": 0,
+          "trace_id": "tr_b5f5d344f76b"
+        }
+      ],
+      "salience": 0.76,
+      "semantic_type": "Relation",
+      "updated_at": 0,
+      "value": "don't"
     },
     {
       "canonical_signature": null,
@@ -140,10 +417,36 @@
           "trace_id": "tr_1cee850860a8"
         }
       ],
-      "salience": 1.0,
+      "salience": 0.95,
       "semantic_type": "Entity",
       "updated_at": 1,
       "value": "Acceleration is the rate of change of velocity."
+    },
+    {
+      "canonical_signature": null,
+      "created_at": 1,
+      "id": "dn_b309e2941b4174e1",
+      "metadata": {
+        "category": "relationship_term",
+        "term": "speed of an object in a given direction"
+      },
+      "provenance": [
+        {
+          "chunk_id": "chunk_47eb5f36",
+          "confidence": 0.75,
+          "extraction_method": "relationship_extractor",
+          "location": "line:3",
+          "source_id": "tmp_it_sn78",
+          "source_path": "/tmp/tmp_it_sn78.txt",
+          "source_type": "document",
+          "timestamp_index": 3,
+          "trace_id": "tr_3075e008dfb0"
+        }
+      ],
+      "salience": 0.5,
+      "semantic_type": "Entity",
+      "updated_at": 1,
+      "value": "speed of an object in a given direction"
     },
     {
       "canonical_signature": null,
@@ -166,10 +469,39 @@
           "trace_id": "tr_b8607bbfbbcc"
         }
       ],
-      "salience": 0.5,
+      "salience": 0.475,
       "semantic_type": "Entity",
       "updated_at": 0,
       "value": "acceleration"
+    },
+    {
+      "canonical_signature": null,
+      "created_at": 2,
+      "id": "dn_bbe2ab8fb187401b",
+      "metadata": {
+        "category": "definition",
+        "chunk_id": "chunk_79d22142",
+        "definition_text": "Force is mass times acceleration.",
+        "ingestion_mode": "dictionary",
+        "term": "force"
+      },
+      "provenance": [
+        {
+          "chunk_id": "chunk_79d22142",
+          "confidence": 0.8,
+          "extraction_method": "pattern_v1",
+          "location": "line:2",
+          "source_id": "tmp_it_sn78",
+          "source_path": "/tmp/tmp_it_sn78.txt",
+          "source_type": "document",
+          "timestamp_index": 2,
+          "trace_id": "tr_6cff04416060"
+        }
+      ],
+      "salience": 1.0,
+      "semantic_type": "Entity",
+      "updated_at": 2,
+      "value": "Force is mass times acceleration."
     },
     {
       "canonical_signature": null,
@@ -192,10 +524,33 @@
           "trace_id": "tr_37a612efc80c"
         }
       ],
-      "salience": 0.5,
+      "salience": 0.475,
       "semantic_type": "Entity",
       "updated_at": 0,
       "value": "mass"
+    },
+    {
+      "canonical_signature": null,
+      "created_at": 0,
+      "id": "dn_d8371119ec1849b6",
+      "metadata": {},
+      "provenance": [
+        {
+          "chunk_id": null,
+          "confidence": 1.0,
+          "extraction_method": "_generic_Event_2in",
+          "location": null,
+          "source_id": "_generic_Event_2in",
+          "source_path": null,
+          "source_type": "execution",
+          "timestamp_index": 0,
+          "trace_id": "tr_00d21a9ebe59"
+        }
+      ],
+      "salience": 0.76,
+      "semantic_type": "Process",
+      "updated_at": 0,
+      "value": "don't"
     },
     {
       "canonical_signature": null,
@@ -218,13 +573,42 @@
           "trace_id": "tr_b8607bbfbbcc"
         }
       ],
-      "salience": 0.5,
+      "salience": 0.475,
       "semantic_type": "Entity",
       "updated_at": 0,
       "value": "velocity"
+    },
+    {
+      "canonical_signature": null,
+      "created_at": 3,
+      "id": "dn_f7a4e9014be63a85",
+      "metadata": {
+        "category": "definition",
+        "chunk_id": "chunk_47eb5f36",
+        "definition_text": "Velocity is the speed of an object in a given direction.",
+        "ingestion_mode": "dictionary",
+        "term": "velocity"
+      },
+      "provenance": [
+        {
+          "chunk_id": "chunk_47eb5f36",
+          "confidence": 0.8,
+          "extraction_method": "pattern_v1",
+          "location": "line:3",
+          "source_id": "tmp_it_sn78",
+          "source_path": "/tmp/tmp_it_sn78.txt",
+          "source_type": "document",
+          "timestamp_index": 3,
+          "trace_id": "tr_76e84245b437"
+        }
+      ],
+      "salience": 1.0,
+      "semantic_type": "Entity",
+      "updated_at": 3,
+      "value": "Velocity is the speed of an object in a given direction."
     }
   ],
   "schema_version": "1.2",
-  "snapshot_id": "snap_b9f614a6f9377bd8",
+  "snapshot_id": "snap_175d8f70a35c87f2",
   "temporal_index": []
 }

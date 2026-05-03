@@ -1,0 +1,377 @@
+# Lamina AGI Integration Architecture (Foundation Document)
+
+## Purpose
+
+This document defines the **correct architectural direction for Lamina**, consolidating all prior work into a unified system capable of progressing toward Artificial General Intelligence (AGI).
+
+It establishes:
+
+* What **Lamina (L-CDEA)** already provides
+* What is **missing for AGI**
+* Which concepts from other repositories are **worth integrating**
+* The **order of integration**
+* The **target system architecture**
+
+---
+
+## 1. Core Principle
+
+Lamina must not be rebuilt from scratch.
+
+```text
+L-CDEA = the semantic kernel (the brain)
+```
+
+Everything else must extend it.
+
+---
+
+## 2. What L-CDEA Already Solves
+
+L-CDEA is a **deterministic semantic cognition system**, not just a parser.
+
+It already provides:
+
+### 2.1 Knowledge Representation
+
+* Typed nodes: ENTITY, EVENT, STATE, PROCESS, RELATION
+* Canonicalization (CAS)
+* Provenance tracking
+* DiscourseState persistence
+
+### 2.2 Knowledge Acquisition
+
+* Definition extraction (`X is Y`, `X means Y`)
+* Relationship extraction
+* Book ingestion pipeline
+* Dictionary / glossary detection
+
+### 2.3 Reasoning
+
+* Multi-hop traversal
+* Composition reasoning
+* Derived relationships (closure)
+* Deterministic operator execution (CDL)
+
+### 2.4 Execution Control
+
+* MECP (cost-based execution)
+* Structured routing
+* Deterministic outputs
+
+---
+
+## 3. What L-CDEA Does NOT Yet Provide
+
+To move toward AGI, the following capabilities must be added:
+
+```text
+1. Continuous experience stream
+2. Event → state → transition modeling
+3. Prediction (next state / outcome)
+4. Value inference (not hardcoded reward)
+5. Temporal-difference learning
+6. Latent context inference and splitting
+7. Action selection (later stage)
+```
+
+---
+
+## 4. Required Extension Layer
+
+A new module must be added:
+
+```text
+l_cdea/experience/
+```
+
+### 4.1 Components
+
+```text
+event_model.py        → core structures
+event_extractor.py    → parse real-world events
+event_ingest.py       → store into DiscourseState
+transition_model.py   → track temporal transitions
+predictor.py          → generate predictions
+value_evidence.py     → derive value from graph
+td_learning.py        → update predictions
+latent_context.py     → context splitting
+trace.py              → debug and introspection
+```
+
+---
+
+## 5. Event vs Knowledge Separation
+
+Critical rule:
+
+```text
+Knowledge ≠ Experience
+```
+
+### 5.1 Knowledge (L-CDEA ingestion)
+
+```text
+"A cat is an animal"
+"Acceleration is the rate of change of velocity"
+```
+
+→ Stored as definitions and relationships
+
+### 5.2 Experience (new layer)
+
+```text
+"I am hungry"
+"The CEO gave everyone a bonus"
+"The burger burned in the microwave"
+```
+
+→ Stored as:
+
+* EVENT nodes
+* STATE nodes
+* PROCESS nodes
+
+---
+
+## 6. Cognitive Model (AGI Loop)
+
+The system must implement:
+
+```text
+experience → prediction → action → outcome → error → update
+```
+
+### 6.1 Prediction
+
+Derived from:
+
+```text
+multi-hop reasoning
++ composition rules
+```
+
+### 6.2 Value (NOT hardcoded reward)
+
+Derived from graph evidence:
+
+```text
+pain → negative
+hunger → negative
+food → reduces hunger → positive
+damage → negative
+goal completion → positive
+```
+
+### 6.3 Learning
+
+Temporal-difference:
+
+```text
+δ = value + γV(next_state) - V(current_state)
+```
+
+---
+
+## 7. Latent Context (Critical for Generalization)
+
+From neuroscience:
+
+* Cognitive maps represent **latent variables**
+* These are **not directly observable**
+* They are inferred from **experience sequences**
+
+Example:
+
+```text
+"kitchen"
+→ my kitchen
+→ friend's kitchen
+→ messy kitchen
+```
+
+System behavior:
+
+```text
+prediction error repeats
+→ split context
+→ create new latent state
+```
+
+---
+
+## 8. Integration of Other Repositories
+
+### 8.1 lamina_continuum (High Value)
+
+Incorporate:
+
+```text
+AURA3D / .hdasc
+learned_associations.rs
+semantic_graph.rs
+HCP (communication protocol)
+SGL (stability layer)
+DMM (decision module)
+ETR (temporal resonance)
+.hdeac memory snapshots
+```
+
+Purpose:
+
+```text
+Embodied memory
+Emotional/value priors
+System stability
+Persistent state encoding
+```
+
+---
+
+### 8.2 lamina_cognitive_substrate (Medium-High Value)
+
+Incorporate:
+
+```text
+field → anchor → composite anchor
+prediction error tracking
+ambiguity detection
+latent splitting
+cognitive transitions
+```
+
+Purpose:
+
+```text
+Prediction-driven learning
+Latent structure formation
+Hippocampal-style behavior
+```
+
+---
+
+### 8.3 LNDE (Medium Value, Later)
+
+Incorporate:
+
+```text
+listener loop
+speech encoding
+session memory
+hallucination filtering
+voice interface
+```
+
+Purpose:
+
+```text
+Human interaction layer
+Input/output shell
+```
+
+---
+
+## 9. What NOT to Do
+
+Do NOT:
+
+```text
+rebuild lexeme systems
+create separate knowledge stores
+duplicate ingestion pipelines
+mix event data with definitions
+add abstraction layers without function
+merge entire repos blindly
+```
+
+---
+
+## 10. Target Architecture
+
+```text
+INPUT
+→ L-CDEA router
+
+IF knowledge:
+    → ingestion → DiscourseState
+
+IF query:
+    → operator execution
+
+IF event:
+    → experience layer
+
+EXPERIENCE LAYER
+→ event/state/process nodes
+→ transition model
+
+GRAPH + EXPERIENCE
+→ composition reasoning
+→ prediction
+→ value inference
+
+LEARNING
+→ TD update
+→ latent context split
+
+OPTIONAL LAYERS
+→ AURA3D embeddings
+→ emotional/value fields
+→ voice interface
+```
+
+---
+
+## 11. Development Order
+
+```text
+1. Clean L-CDEA clone (fresh start)
+2. Verify ingestion + retrieval
+3. Implement event_model
+4. Implement event_extractor
+5. Implement event_ingest
+6. Add transition_model
+7. Add predictor
+8. Add value_evidence
+9. Add TD learning
+10. Add latent context splitting
+11. Integrate continuum concepts
+12. Add LNDE interface
+```
+
+---
+
+## 12. Key Insight
+
+You are not building:
+
+```text
+a chatbot
+a parser
+a knowledge base
+```
+
+You are building:
+
+```text
+a system that:
+- organizes knowledge as a graph
+- experiences the world as events
+- predicts outcomes
+- learns from error
+- builds latent structure
+- generalizes across contexts
+```
+
+---
+
+## 13. Final Statement
+
+```text
+L-CDEA is the brain.
+Everything else is the body, memory, and learning loop.
+```
+
+Do not replace it.
+
+Extend it.

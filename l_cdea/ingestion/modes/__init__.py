@@ -18,6 +18,7 @@ from l_cdea.ingestion.modes.config import (
     DOCUMENT_MODE,
     DICTIONARY_MODE,
     DOCUMENT_STRUCTURED_MODE,
+    SEMANTIC_MODE,
     get_mode_config,
     validate_mode,
 )
@@ -38,6 +39,7 @@ __all__ = [
     "DOCUMENT_MODE",
     "DICTIONARY_MODE",
     "DOCUMENT_STRUCTURED_MODE",
+    "SEMANTIC_MODE",
     "get_mode_config",
     "validate_mode",
     "is_valid_dictionary_chunk",

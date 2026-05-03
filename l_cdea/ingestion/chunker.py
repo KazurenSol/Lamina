@@ -57,6 +57,8 @@ def chunk_document_with_trace(
 
     if mode == "dictionary":
         return _chunk_dictionary(doc, effective_min)
+    elif mode == "semantic":
+        return _chunk_semantic_delegate(doc)
     else:
         return _chunk_document(doc, effective_min)
 

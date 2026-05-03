@@ -1,0 +1,455 @@
+# Lamina AGI Trajectory — Learning, Generalization, and Cognitive Map Alignment
+
+## Purpose
+
+This document aligns core AGI principles (derived from the interview notes and cognitive neuroscience insights) with the Lamina architecture.
+
+It translates abstract AGI ideas into **concrete system design requirements**.
+
+---
+
+## 1. Core Thesis
+
+AGI is not:
+
+```text
+pattern matching
+static knowledge
+pre-trained intelligence
+```
+
+AGI is:
+
+```text
+continuous learning from experience
++ prediction
++ error correction
++ structured world modeling
++ goal-directed behavior
+```
+
+This directly maps to what Lamina must become.
+
+---
+
+## 2. Mapping Interview Concepts → Lamina Architecture
+
+### 2.1 “Learn from experience and generalize”
+
+This is the central requirement.
+
+From the neuroscience notes:
+
+* The brain builds a **cognitive map**
+* Knowledge is organized as a **relational graph**
+* Generalization occurs by operating over that structure 
+
+#### Lamina Mapping
+
+```text
+DiscourseState = cognitive map
+nodes + relations = graph
+multi-hop reasoning = generalization
+```
+
+Missing piece:
+
+```text
+experience stream → update graph
+```
+
+---
+
+### 2.2 “What is right? Prior knowledge + predict + ground truth”
+
+This is **prediction error minimization**.
+
+#### Lamina Mapping
+
+```text
+prediction = graph-based inference
+ground truth = observed event
+error = difference between prediction and outcome
+```
+
+System requirement:
+
+```text
+predictor.py
+td_learning.py
+```
+
+---
+
+### 2.3 “Reinforcement learning / Temporal difference learning”
+
+Key clarification:
+
+```text
+Not reward-driven learning
+→ prediction-error-driven learning
+```
+
+From notes:
+
+```text
+we do not learn from reward but from all data
+```
+
+#### Lamina Mapping
+
+```text
+value_evidence derived from graph
+TD update uses:
+  δ = value + γV(next_state) - V(current_state)
+```
+
+No hardcoded rewards.
+
+---
+
+### 2.4 “Try things and see what happens”
+
+This implies:
+
+```text
+action → outcome → update
+```
+
+#### Lamina Mapping (future stage)
+
+```text
+action module (later)
+→ generate action candidates
+→ simulate via graph
+→ execute
+→ observe result
+```
+
+---
+
+### 2.5 “Continuous learning as a stream of events”
+
+This is critical.
+
+#### Lamina Mapping
+
+```text
+event stream:
+  EVENT → STATE → PROCESS → TRANSITION
+
+stored in DiscourseState
+```
+
+This is the missing half of L-CDEA.
+
+---
+
+### 2.6 “Connections and knowledge of things that happen”
+
+This is already solved:
+
+```text
+L-CDEA relationships
+multi-hop reasoning
+composition
+```
+
+But must be extended to:
+
+```text
+event-driven connections
+temporal transitions
+```
+
+---
+
+### 2.7 “Imitation as the gate toward higher order thinking”
+
+Interpretation:
+
+```text
+learn patterns of behavior from observation
+```
+
+#### Lamina Mapping
+
+```text
+event sequence learning
+pattern extraction
+process templates
+```
+
+Example:
+
+```text
+observe:
+  human cooks food
+
+learn:
+  cooking process
+→ reusable structure
+```
+
+---
+
+### 2.8 “Motivation = avoid pain + seek pleasure + increase understanding”
+
+Three components:
+
+```text
+1. survival (pain avoidance)
+2. reward (pleasure)
+3. curiosity (understanding)
+```
+
+#### Lamina Mapping
+
+```text
+value_evidence:
+  pain → negative
+  hunger → negative
+  damage → negative
+  knowledge gain → positive
+  goal completion → positive
+```
+
+This becomes:
+
+```text
+intrinsic motivation system
+```
+
+---
+
+### 2.9 “Knowledge distribution (transfer learning)”
+
+From neuroscience:
+
+```text
+factorization of knowledge
+structure reused across contexts :contentReference[oaicite:1]{index=1}
+```
+
+#### Lamina Mapping
+
+```text
+graph structure reused
+only sensory/context nodes differ
+```
+
+Example:
+
+```text
+kitchen → cooking
+applies across all kitchens
+```
+
+---
+
+### 2.10 “The world is big — learn on the way”
+
+Implication:
+
+```text
+no fixed dataset
+no pre-complete knowledge
+```
+
+#### Lamina Requirement
+
+```text
+open-ended ingestion
+continuous learning
+never complete
+```
+
+---
+
+### 2.11 “Temporal difference learning toward a goal”
+
+This introduces:
+
+```text
+goal-directed learning
+```
+
+#### Lamina Mapping
+
+```text
+goal = desired state
+TD learning propagates value backward from goal
+```
+
+Example:
+
+```text
+goal: not hungry
+
+eat → reduces hunger
+→ action becomes preferred
+```
+
+---
+
+### 2.12 “Stages of intelligence → stages of system design”
+
+This implies:
+
+```text
+AGI must emerge in layers
+```
+
+#### Lamina Development Stages
+
+```text
+Stage 1: Knowledge (L-CDEA)
+Stage 2: Experience (event layer)
+Stage 3: Prediction (multi-hop + TD)
+Stage 4: Value (graph-based)
+Stage 5: Latent context (splitting)
+Stage 6: Action/control
+Stage 7: Self-improvement
+```
+
+---
+
+### 2.13 “Ability to create file formats, compression, and improve itself”
+
+This is **meta-learning / self-modification**.
+
+#### Lamina Mapping
+
+```text
+system learns:
+  better representations
+  better structures
+  better encodings
+```
+
+Future capability:
+
+```text
+generate new node types
+optimize graph structures
+compress knowledge paths
+```
+
+---
+
+## 3. Integration with Cognitive Map Theory
+
+From neuroscience notes:
+
+```text
+brain builds relational graphs
+tracks position in that graph
+uses path integration
+adds latent dimensions when needed
+factorizes structure vs sensory data
+```
+
+#### Direct Mapping
+
+```text
+DiscourseState = graph
+EVENT sequence = path
+prediction = path continuation
+latent_context = hidden dimensions
+value = navigation objective
+```
+
+---
+
+## 4. Unified AGI Loop in Lamina
+
+Final system behavior:
+
+```text
+INPUT
+→ parse
+
+IF knowledge:
+  → ingest → update graph
+
+IF event:
+  → extract EVENT/STATE
+  → store transition
+
+GRAPH + EXPERIENCE
+→ predict next state
+
+OBSERVE outcome
+→ compute prediction error
+
+ERROR
+→ update value + transitions
+→ possibly split context
+
+VALUE
+→ biases future predictions/actions
+```
+
+---
+
+## 5. Key Insight
+
+AGI is not:
+
+```text
+bigger model
+better prompts
+more data
+```
+
+AGI is:
+
+```text
+a system that:
+- builds a structured world model
+- updates it from experience
+- predicts outcomes
+- learns from error
+- generalizes across contexts
+- operates continuously
+```
+
+---
+
+## 6. Final Alignment
+
+Your system already has:
+
+```text
+L-CDEA = structure + reasoning
+```
+
+You are adding:
+
+```text
+experience + prediction + learning
+```
+
+This combination matches:
+
+```text
+cognitive map + reinforcement learning + latent space modeling
+```
+
+---
+
+## 7. Conclusion
+
+```text
+AGI = cognitive map + experience stream + prediction + learning + value
+```
+
+Lamina already has the cognitive map.
+
+The remaining work is to:
+
+```text
+connect it to experience and learning
+```
+
+Everything in the interview aligns with this direction.

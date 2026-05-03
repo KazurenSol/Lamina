@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-VALID_MODES = frozenset({"document", "dictionary", "document_structured", "book"})
+VALID_MODES = frozenset({"document", "dictionary", "document_structured", "book", "semantic"})
 
 
 @dataclass(frozen=True)
@@ -50,11 +50,19 @@ BOOK_MODE = IngestionModeConfig(
     confidence_weight_override=None,
 )
 
+SEMANTIC_MODE = IngestionModeConfig(
+    mode="semantic",
+    min_chunk_chars=10,
+    definition_priority_boost=0,
+    confidence_weight_override=None,
+)
+
 _MODE_MAP = {
     "document":             DOCUMENT_MODE,
     "dictionary":           DICTIONARY_MODE,
     "document_structured":  DOCUMENT_STRUCTURED_MODE,
     "book":                 BOOK_MODE,
+    "semantic":             SEMANTIC_MODE,
 }
 
 
