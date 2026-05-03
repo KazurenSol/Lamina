@@ -52,11 +52,11 @@ def test_router():
     assert r_a.selected_intent.slots == r_b.selected_intent.slots
     print(f"  [PASS] determinism verified — same input same confidence")
 
-    # Extra: biology pattern
-    result6, _ = route_with_trace(_make_parsed("explain photosynthesis"))
+    # Extra: biology pattern ("explain X" routes to GET_DEFINITION; use unambiguous verb)
+    result6, _ = route_with_trace(_make_parsed("simulate photosynthesis"))
     assert result6.selected_intent.domain == "biology"
     assert result6.selected_intent.operator_name == "PHOTOSYNTHESIS"
-    print(f"  [PASS] 'explain photosynthesis' → biology.PHOTOSYNTHESIS")
+    print(f"  [PASS] 'simulate photosynthesis' → biology.PHOTOSYNTHESIS")
 
     # Extra: finance pattern
     result7, _ = route_with_trace(_make_parsed("deposit 100 into my account"))

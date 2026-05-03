@@ -85,7 +85,7 @@ def test_planner():
 
     # ── Example 5: Operator not found ─────────────────────────────────────
     from l_cdea.core.planner.plan import PlanningError
-    op, err = resolve_operator("geography", "NONEXISTENT_OP", {"region": TypedValue("X", E)})
+    op, err, _ = resolve_operator("geography", "NONEXISTENT_OP", {"region": TypedValue("X", E)})
     assert err is not None
     assert err.code == PlanningError.OPERATOR_NOT_FOUND
     print(f"  [PASS] Example 5 — OPERATOR_NOT_FOUND: {err.message}")
