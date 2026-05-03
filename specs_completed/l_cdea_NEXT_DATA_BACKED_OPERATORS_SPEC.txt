@@ -1,0 +1,329 @@
+PROJECT: L-CDEA
+MODULE: data_backed_operators/
+
+PURPOSE:
+Enable selected domain operators to return real stored values from deterministic datasets or DiscourseState-backed facts instead of symbolic placeholder outputs.
+
+Current issue:
+  geography.CAPITAL_OF("France") returns:
+    capital_of(France)
+
+Desired behavior:
+  geography.CAPITAL_OF("France") returns:
+    Paris
+
+This module introduces a deterministic data lookup layer for operators while preserving CDL semantics.
+
+---
+
+# POSITION IN PIPELINE
+
+Input
+→ Parser
+→ Router
+→ Planner
+→ Data-backed Operator Resolution
+→ Graph Construction
+→ Execution
+→ DiscourseState
+→ Trace
+
+---
+
+# DIRECTORY STRUCTURE
+
+l_cdea/data/
+├── __init__.py
+├── datasets.py
+├── registry.py
+├── lookup.py
+├── loaders.py
+├── validation.py
+└── tests.py
+
+---
+
+# CORE CONCEPT
+
+Domain operators may declare a data backing.
+
+Example:
+
+CAPITAL_OF(region)
+=
+LOOKUP(region, country_capitals_dataset)
+
+The operator remains semantic.
+The dataset provides the concrete result.
+
+---
+
+# DATASET STRUCTURE
+
+Dataset {
+  name: str
+  domain: str
+  key_type: SemanticType
+  value_type: SemanticType
+  records: Dict[str, Any]
+  version: str
+  provenance: Dict
+}
+
+Example:
+
+Dataset {
+  name: "country_capitals_v1"
+  domain: "geography"
+  key_type: Entity
+  value_type: Entity
+  records: {
+    "France": "Paris",
+    "Spain": "Madrid",
+    "Japan": "Tokyo"
+  }
+}
+
+---
+
+# FILES
+
+## datasets.py
+
+Defines Dataset and DatasetRecord.
+
+DatasetRecord {
+  key
+  value
+  provenance
+}
+
+---
+
+## registry.py
+
+Defines DatasetRegistry.
+
+Functions:
+  register_dataset(dataset)
+  get_dataset(name)
+  list_datasets()
+  has_dataset(name)
+
+Rules:
+  - registration must be deterministic
+  - duplicate dataset names rejected unless version differs
+  - no network access in V1
+
+---
+
+## lookup.py
+
+Defines deterministic lookup functions.
+
+Functions:
+  lookup(dataset_name, key) -> TypedValue
+  contains(dataset_name, key) -> bool
+
+Rules:
+  - exact match first
+  - normalized string match second
+  - no fuzzy matching in V1
+  - missing key returns typed LookupMiss, not crash
+
+---
+
+## loaders.py
+
+Defines local dataset loading.
+
+Supported V1:
+  - Python dict
+  - JSON file
+
+Rules:
+  - no external APIs
+  - no web access
+  - no hidden mutation
+  - deterministic load order
+
+---
+
+## validation.py
+
+Validates datasets.
+
+Checks:
+  - key/value type compatibility
+  - duplicate keys
+  - missing provenance
+  - stable serialization
+
+---
+
+# OPERATOR INTEGRATION RULE
+
+A domain operator MAY be data-backed if:
+
+1. It has a declared dataset_name
+2. Its first input maps to dataset key
+3. Dataset value type matches operator output type
+4. Lookup is deterministic
+
+Example:
+
+geography.CAPITAL_OF(region)
+  dataset_name = "country_capitals_v1"
+  lookup_key = region.value
+  output = TypedValue(dataset[key], Entity)
+
+---
+
+# GEOGRAPHY V1 REQUIRED DATASETS
+
+Add minimal deterministic geography datasets:
+
+country_capitals_v1:
+
+France → Paris
+Spain → Madrid
+Japan → Tokyo
+United States → Washington, D.C.
+Mexico → Mexico City
+Canada → Ottawa
+Germany → Berlin
+Italy → Rome
+United Kingdom → London
+China → Beijing
+
+us_state_capitals_v1:
+
+Texas → Austin
+California → Sacramento
+Florida → Tallahassee
+New York → Albany
+North Carolina → Raleigh
+Virginia → Richmond
+Washington → Olympia
+Arizona → Phoenix
+Alaska → Juneau
+Hawaii → Honolulu
+
+---
+
+# REQUIRED OPERATOR PATCHES
+
+Patch geography operators:
+
+CAPITAL_OF(region)
+  if region exists in country_capitals_v1:
+    return capital city
+  else if region exists in us_state_capitals_v1:
+    return state capital
+  else:
+    return symbolic fallback capital_of(region)
+
+LOCATED_IN(entity, region)
+  may remain symbolic in V1 unless dataset exists
+
+---
+
+# HARD RULES
+
+1. Data-backed operators MUST remain deterministic.
+2. Data lookup MUST NOT modify CDL semantics.
+3. Dataset lookup MUST NOT call external services in V1.
+4. Missing data MUST fail gracefully or return symbolic fallback.
+5. All dataset values MUST include provenance.
+6. Dataset loading MUST be versioned.
+7. Data-backed results MAY be written to DiscourseState after execution.
+8. Data-backed lookup MUST be trace-visible.
+
+---
+
+# TRACE REQUIREMENTS
+
+Trace MUST include:
+
+DataLookupTrace {
+  operator_name
+  dataset_name
+  lookup_key
+  hit
+  returned_value
+  fallback_used
+  provenance
+}
+
+Example:
+
+operator_name = geography.CAPITAL_OF
+dataset_name = country_capitals_v1
+lookup_key = France
+hit = true
+returned_value = Paris
+fallback_used = false
+
+---
+
+# VALIDATION EXAMPLES
+
+Example 1:
+Input:
+  "capital of France"
+
+Expected:
+  route = geography.CAPITAL_OF
+  lookup dataset = country_capitals_v1
+  output = Paris
+
+---
+
+Example 2:
+Input:
+  "capital of Texas"
+
+Expected:
+  route = geography.CAPITAL_OF
+  lookup dataset = us_state_capitals_v1
+  output = Austin
+
+---
+
+Example 3:
+Input:
+  "capital of Atlantis"
+
+Expected:
+  lookup miss
+  symbolic fallback = capital_of(Atlantis)
+  no crash
+
+---
+
+Example 4:
+Repeat:
+  "capital of France"
+
+Expected second in-process run:
+  cache_hit = true
+  output = Paris
+
+---
+
+# IMPLEMENTATION PRIORITY
+
+1. data/datasets.py
+2. data/registry.py
+3. data/loaders.py
+4. data/lookup.py
+5. data/validation.py
+6. data/__init__.py
+7. patch geography.CAPITAL_OF
+8. add trace payload for data lookup
+9. data/tests.py
+10. geography/tests.py updates
+
+---
+
+# END OF SPEC

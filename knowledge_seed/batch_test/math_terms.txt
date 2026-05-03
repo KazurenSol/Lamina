@@ -1,0 +1,3 @@
+Variable is a symbol that represents a value.
+Equation is a statement that two expressions are equal.
+Function is a relation between inputs and outputs.

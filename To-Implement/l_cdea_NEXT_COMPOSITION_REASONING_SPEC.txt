@@ -1,0 +1,394 @@
+PROJECT: L-CDEA
+MODULE: discourse/composition_reasoning/
+
+PURPOSE:
+Enable deterministic composition of multi-hop relationship paths into new derived knowledge (inferred facts), without mutating DiscourseState.
+
+Current state:
+- Multi-hop traversal returns paths:
+    force → acceleration → velocity
+- System lists paths but does NOT derive new semantic statements.
+
+Desired behavior:
+From paths, derive:
+
+    force indirectly depends_on velocity
+
+and expose it at query time with full provenance.
+
+---
+
+# POSITION IN PIPELINE
+
+Input
+→ Router
+→ Planner
+→ Multi-Hop Traversal
+→ Composition Reasoning (THIS MODULE)
+→ Output + Trace
+
+Composition operates AFTER traversal and BEFORE output.
+
+---
+
+# DIRECTORY STRUCTURE
+
+l_cdea/discourse/composition_reasoning/
+├── __init__.py
+├── composer.py
+├── rules.py
+├── operator.py
+├── patterns.py
+├── trace.py
+└── tests.py
+
+---
+
+# CORE OPERATOR
+
+COMPOSE_RELATIONSHIPS(term, relation_type, max_depth) -> Entity
+
+Example:
+
+COMPOSE_RELATIONSHIPS("force", "depends_on", 3)
+
+---
+
+# ROUTER PATTERNS
+
+Patterns:
+
+1. "what does X indirectly depend on"
+2. "what does X ultimately depend on"   (may alias closure)
+3. "what are indirect dependencies of X"
+4. "derive dependencies of X"
+
+Route to:
+
+IntentFrame {
+  domain: "discourse"
+  operator_name: "COMPOSE_RELATIONSHIPS"
+  slots: {
+    "term": X,
+    "relation_type": "depends_on",
+    "max_depth": "3"
+  }
+  arg_order: ("term", "relation_type", "max_depth")
+}
+
+Priority:
+  composition patterns = 196
+  multi-hop patterns = 195
+  one-hop patterns = 190
+  definition patterns = 200
+
+---
+
+# COMPOSITION INPUT
+
+composer.py receives:
+
+RelationshipClosureResult {
+  source_term
+  relation_type
+  max_depth
+  paths: Tuple[RelationshipPath, ...]
+}
+
+---
+
+# COMPOSITION RULES
+
+rules.py defines deterministic composition.
+
+V1 rule set:
+
+Rule 1 — indirect dependency:
+
+If path length ≥ 2:
+
+  X → ... → Y
+
+derive:
+
+  X indirectly_depends_on Y
+
+---
+
+Rule 2 — direct vs indirect separation:
+
+Paths of length 1:
+  remain direct dependencies
+
+Paths of length ≥ 2:
+  become indirect dependencies
+
+---
+
+Rule 3 — deduplication:
+
+If multiple paths lead to same target:
+  merge into one composed result
+
+---
+
+Rule 4 — dominance:
+
+If Y is reachable both directly and indirectly:
+  keep direct as primary
+  mark indirect separately
+
+Example:
+
+force → acceleration
+force → acceleration → velocity
+
+velocity is indirect only
+
+---
+
+# RESULT TYPES
+
+ComposedRelationship {
+  source: str
+  relation_type: str
+  target: str
+  is_indirect: bool
+  paths: Tuple[Tuple[str, ...], ...]
+  provenance: Tuple[Provenance, ...]
+}
+
+CompositionResult {
+  source_term: str
+  relation_type: str
+  direct: Tuple[ComposedRelationship, ...]
+  indirect: Tuple[ComposedRelationship, ...]
+  fallback_used: bool
+}
+
+---
+
+# PROVENANCE RULES
+
+Provenance MUST be aggregated from underlying paths.
+
+For:
+
+force → acceleration → velocity
+
+Aggregate:
+- provenance(force→acceleration)
+- provenance(acceleration→velocity)
+
+Rules:
+1. combine provenance sets
+2. deduplicate by trace_id
+3. sort by confidence DESC
+4. limit display per config
+
+---
+
+# OPERATOR BEHAVIOR
+
+COMPOSE_RELATIONSHIPS executes:
+
+1. call multi-hop traversal
+2. apply composition rules
+3. produce CompositionResult
+
+If no paths:
+  return compose_of(term, relation_type)
+  fallback_used=True
+
+---
+
+# PLANNER INTEGRATION
+
+Planner MUST:
+
+1. detect COMPOSE_RELATIONSHIPS
+2. call traversal module
+3. pass result to composer
+4. short-circuit execution
+5. cache only real composed results
+
+---
+
+# GOVERNANCE INTEGRATION
+
+Register:
+
+discourse.COMPOSE_RELATIONSHIPS@1.0
+
+TypeSignature:
+  [Entity, Entity, Entity] → Entity
+
+metadata:
+  deterministic = true
+  side_effect_free = true
+
+---
+
+# TRACE REQUIREMENTS
+
+CompositionTrace {
+  source_term
+  relation_type
+  max_depth
+  input_paths
+  composed_direct
+  composed_indirect
+  fallback_used
+}
+
+Each composed item includes:
+  target
+  paths
+  provenance_count
+
+---
+
+# CLI OUTPUT FORMAT
+
+Input:
+  "what does force indirectly depend on"
+
+Output:
+
+[Entity] force dependencies:
+
+Direct:
+- acceleration
+  path: force → acceleration
+  [source: ...]
+
+- mass
+  path: force → mass
+  [source: ...]
+
+Indirect:
+- velocity
+  path: force → acceleration → velocity
+  [source: ...]
+
+---
+
+# HARD RULES
+
+1. Composition MUST be deterministic.
+2. MUST NOT modify DiscourseState.
+3. MUST NOT create persistent edges in V1.
+4. MUST preserve provenance.
+5. MUST deduplicate targets.
+6. MUST separate direct and indirect results.
+7. MUST avoid cycles.
+8. MUST not use external services.
+9. MUST respect max_depth.
+10. Fallback must not be cache_hit.
+
+---
+
+# VALIDATION EXAMPLES
+
+Example 1:
+
+Given:
+  force → mass
+  force → acceleration
+  acceleration → velocity
+
+Input:
+  "what does force indirectly depend on"
+
+Expected:
+  Direct:
+    mass, acceleration
+  Indirect:
+    velocity
+
+---
+
+Example 2:
+
+Input:
+  "what does acceleration indirectly depend on"
+
+Expected:
+  Indirect:
+    none (only direct velocity)
+
+---
+
+Example 3 — multiple paths:
+
+A → B → D
+A → C → D
+
+Expected:
+  D appears once
+  paths:
+    A→B→D
+    A→C→D
+
+---
+
+Example 4 — fallback:
+
+Input:
+  "what does entropy indirectly depend on"
+
+Expected:
+  compose_of(entropy, depends_on)
+  fallback_used=True
+
+---
+
+# IMPLEMENTATION PRIORITY
+
+1. discourse/composition_reasoning/rules.py
+2. discourse/composition_reasoning/composer.py
+3. discourse/composition_reasoning/operator.py
+4. discourse/composition_reasoning/patterns.py
+5. discourse/composition_reasoning/trace.py
+6. integrate with multi-hop traversal
+7. register governed operator
+8. patch planner
+9. patch run.py output
+10. add tests.py
+11. run CLI validation
+
+---
+
+# SUCCESS CRITERIA
+
+Command:
+
+python3 -m l_cdea.run "what does force indirectly depend on" --trace
+
+Expected:
+
+Direct:
+  mass, acceleration
+
+Indirect:
+  velocity
+
+With paths and provenance.
+
+---
+
+# DESIGN INTENT
+
+Move from:
+
+graph traversal
+
+to:
+
+semantic composition.
+
+This is the first step toward true reasoning and knowledge synthesis.
+
+---
+
+# END OF SPEC

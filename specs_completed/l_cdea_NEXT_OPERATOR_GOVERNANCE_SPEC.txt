@@ -1,0 +1,336 @@
+PROJECT: L-CDEA
+MODULE: operator_governance/
+
+PURPOSE:
+Provide deterministic governance, validation, versioning, and lifecycle management for all operators in L-CDEA.
+
+The system now contains:
+- core operators
+- domain operators
+- data-backed operators
+- future adaptive/operator candidates
+
+Without governance, operator growth will cause:
+- duplication
+- semantic drift
+- inconsistent TypeSignatures
+- MECP instability
+
+This module ensures:
+- operator correctness
+- uniqueness
+- version control
+- safe evolution
+
+---
+
+# POSITION IN SYSTEM
+
+Operator lifecycle:
+
+definition
+→ validation
+→ registration
+→ usage (planner/execution)
+→ optional evolution (future)
+→ deprecation (future)
+
+---
+
+# DIRECTORY STRUCTURE
+
+l_cdea/operator_governance/
+├── __init__.py
+├── registry.py
+├── validator.py
+├── versioning.py
+├── deduplication.py
+├── approval.py
+├── audit.py
+└── tests.py
+
+---
+
+# CORE TYPES
+
+GovernedOperator {
+  name: str
+  domain: str
+  version: str
+  signature: TypeSignature
+  implementation: Callable
+  metadata: Dict
+  status: str  # "active", "candidate", "deprecated"
+}
+
+OperatorAuditRecord {
+  operator_key: str
+  version: str
+  validation_passed: bool
+  duplicate_detected: bool
+  approved: bool
+  timestamp_index: int
+  notes: Dict
+}
+
+---
+
+# OPERATOR KEY
+
+Operators MUST be uniquely identified by:
+
+operator_key =
+  f"{domain}.{name}@{version}"
+
+Example:
+
+physics.COMPUTE_ACCELERATION@1.0
+
+---
+
+# REGISTRY RULES
+
+registry.py defines:
+
+register_operator(op: GovernedOperator)
+
+get_operator(operator_key)
+
+list_operators()
+
+Rules:
+1. No duplicate operator_key allowed.
+2. Same name + domain MUST require version increment if changed.
+3. Registry MUST be deterministic.
+4. Registry MUST NOT mutate operators after registration.
+
+---
+
+# VALIDATION RULES
+
+validator.py enforces:
+
+validate_operator(op):
+
+Checks:
+
+1. TypeSignature validity
+2. input_types length > 0
+3. output_type defined
+4. implementation callable
+5. deterministic behavior (declared flag in metadata)
+6. no external side effects (V1 requirement)
+7. no mutation of inputs unless explicitly defined
+
+Failure → reject registration
+
+---
+
+# DEDUPLICATION RULES
+
+deduplication.py:
+
+detect_duplicate(op):
+
+Checks:
+
+1. same TypeSignature
+2. same transformation logic (hash or structural equivalence)
+3. same input/output semantics
+
+If duplicate found:
+- registration MUST be rejected
+- OR must be version-linked explicitly
+
+---
+
+# VERSIONING RULES
+
+versioning.py:
+
+Rules:
+
+1. Version MUST follow semantic versioning:
+   MAJOR.MINOR
+
+2. Increment rules:
+
+MAJOR:
+  breaking change in TypeSignature
+
+MINOR:
+  internal improvement, same signature
+
+3. Operator with same name/domain but different version:
+   must coexist
+   must not override previous version
+
+---
+
+# APPROVAL RULES
+
+approval.py:
+
+Operators have states:
+
+candidate
+→ approved
+→ active
+
+Flow:
+
+1. New operator starts as "candidate"
+2. Must pass:
+   - validation
+   - deduplication
+3. Must be explicitly approved
+4. Only "active" operators can be used by planner/execution
+
+Rules:
+
+- No auto-approval
+- No auto-registration into active state
+- Approval MUST be deterministic (manual or rule-based)
+
+---
+
+# AUDIT LOG
+
+audit.py:
+
+record_operator_event(record: OperatorAuditRecord)
+
+Rules:
+
+1. Every registration attempt MUST be logged
+2. Every rejection MUST be logged
+3. Every approval MUST be logged
+4. Audit log MUST be append-only
+5. Audit log MUST be deterministic
+
+---
+
+# INTEGRATION RULES
+
+Planner/operator_resolver MUST:
+
+1. only resolve operators with status == "active"
+2. reject candidate/deprecated operators
+
+Domain modules:
+
+- MUST register operators through governance layer
+- MUST NOT bypass registry
+
+---
+
+# HARD RULES
+
+1. Operators MUST be deterministic in V1.
+2. Operators MUST NOT mutate global state.
+3. Operators MUST NOT call external services.
+4. Operators MUST preserve TypeSignature consistency.
+5. Operators MUST NOT bypass governance layer.
+6. Duplicate operators MUST NOT be allowed.
+7. Versioning MUST be enforced.
+8. Only active operators are executable.
+9. Governance MUST be deterministic.
+10. Governance MUST not alter execution semantics.
+
+---
+
+# FAILURE CASES
+
+Reject operator if:
+
+- missing TypeSignature
+- invalid input/output mapping
+- duplicate detected
+- non-deterministic behavior
+- external dependency present
+- version conflict
+
+Raise:
+
+OperatorValidationError
+OperatorDuplicateError
+OperatorVersionError
+
+---
+
+# VALIDATION EXAMPLES
+
+Example 1:
+
+Register:
+  math.ADD@1.0
+
+Expected:
+  accepted
+  status = active
+
+---
+
+Example 2:
+
+Register duplicate:
+
+  math.ADD@1.0 (same signature)
+
+Expected:
+  rejected (duplicate)
+
+---
+
+Example 3:
+
+Register new version:
+
+  math.ADD@1.1 (same signature, improved impl)
+
+Expected:
+  accepted
+  both versions coexist
+
+---
+
+Example 4:
+
+Register invalid operator:
+
+  missing output_type
+
+Expected:
+  rejected
+
+---
+
+# IMPLEMENTATION PRIORITY
+
+1. operator_governance/registry.py
+2. operator_governance/validator.py
+3. operator_governance/deduplication.py
+4. operator_governance/versioning.py
+5. operator_governance/approval.py
+6. operator_governance/audit.py
+7. operator_governance/tests.py
+8. integrate into OperatorRegistry
+9. patch planner/operator_resolver to use governed registry
+
+---
+
+# DESIGN INTENT
+
+Operators are the executable core of L-CDEA.
+
+Governance ensures:
+- correctness
+- stability
+- scalability
+- safe evolution
+
+Without this layer, the system will degrade as operator count grows.
+
+---
+
+# END OF SPEC

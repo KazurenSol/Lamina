@@ -1,0 +1,401 @@
+Below is your **Claude Code Bootstrap Specification (CCBS v1.0)**.
+
+This is intentionally **linear, dependency-ordered, and implementation-constrained** so Claude Code can execute it without reinterpretation.
+
+---
+
+# L-CDEA — CLAUDE CODE BOOTSTRAP SPEC v1.0
+
+## (Deterministic Semantic Execution System)
+
+---
+
+# 0. SYSTEM PURPOSE
+
+Build a **deterministic semantic execution engine** composed of:
+
+* Typed semantic compiler (CDL)
+* Discourse memory graph (DiscourseState)
+* Minimum-effective-computation scheduler (MECP)
+* Discourse policy kernel (DPK)
+* Canonicalization system (CAS)
+* Graph-based execution runtime
+
+---
+
+# 1. HARD GLOBAL INVARIANTS (NON-NEGOTIABLE)
+
+These apply to ALL modules:
+
+## 1.1 Determinism
+
+Same input + same state → identical output
+
+## 1.2 Layer Isolation
+
+No module may access or mutate internal state of another module directly.
+
+## 1.3 Type Safety
+
+All semantic operations must be typed.
+
+## 1.4 MECP Enforcement
+
+No computation expands unless MECP approves it.
+
+## 1.5 Canonical Consistency
+
+Equivalent structures must normalize to identical forms.
+
+---
+
+# 2. SYSTEM EXECUTION PIPELINE (STRICT ORDER)
+
+This order is FIXED.
+
+```text id="pipeline_1"
+INPUT
+  ↓
+(1) Input Parser
+  ↓
+(2) Lexical + Type Resolution
+  ↓
+(3) CDL Compiler
+  ↓
+(4) Canonicalization (CAS)
+  ↓
+(5) MECP Scheduler (Pruning / Expansion Control)
+  ↓
+(6) Graph Execution Engine
+  ↓
+(7) DiscourseState Update
+  ↓
+(8) Trace Logger
+```
+
+---
+
+# 3. CORE MODULES (IMPLEMENT IN THIS ORDER)
+
+---
+
+# 3.1 TYPES MODULE (FIRST BUILD)
+
+## Purpose
+
+Defines all semantic categories.
+
+## Allowed Types:
+
+```text id="types_1"
+Entity
+Event
+State
+Process
+Relation
+Constraint
+Abstraction
+```
+
+## Rule:
+
+Every CDL operator MUST define:
+
+```text id="type_sig"
+input_types → output_type
+```
+
+---
+
+# 3.2 CDL MODULE (SEMANTIC CORE)
+
+## Purpose
+
+Deterministic operator-based meaning system.
+
+## Structure:
+
+```text id="cdl_op"
+Operator:
+  name
+  input_types
+  output_type
+  transformation_rule
+```
+
+## Rule:
+
+* CDL is immutable at runtime
+* No probabilistic interpretation allowed here
+
+---
+
+# 3.3 INPUT PARSER
+
+## Purpose
+
+Convert raw text → tokens
+
+## Output:
+
+```text id="parse_out"
+Tokens + structural hints
+```
+
+No semantic decisions yet.
+
+---
+
+# 3.4 TYPE + SENSE RESOLUTION
+
+## Purpose
+
+Map tokens → typed semantic candidates
+
+## Rule:
+
+* generate candidate meanings (top-k only)
+* DO NOT prune yet (MECP happens later)
+
+---
+
+# 3.5 CDL COMPILER
+
+## Purpose
+
+Convert typed meanings → CDL graph
+
+## Output:
+
+```text id="cdl_graph"
+Directed acyclic graph of operators
+```
+
+---
+
+# 3.6 CANONICALIZATION SYSTEM (CAS)
+
+## Purpose
+
+Normalize equivalent CDL graphs
+
+## Operations:
+
+* reorder invariant operations
+* merge equivalent subgraphs
+* normalize argument structure
+* reduce redundant structures
+
+## Rule:
+
+Must be applied BEFORE MECP.
+
+---
+
+# 3.7 MECP SCHEDULER (CONTROL CORE)
+
+## Purpose
+
+Control computational expansion.
+
+## Core rule:
+
+```text id="mecp_rule"
+Expand node N only if:
+  Expected_Information_Gain / Cost > threshold
+```
+
+## Responsibilities:
+
+* prune interpretation branches
+* limit depth expansion
+* stop early once sufficient certainty reached
+
+## Constraint:
+
+NEVER modifies semantics or CDL rules.
+
+---
+
+# 3.8 GRAPH EXECUTION ENGINE
+
+## Purpose
+
+Execute CDL graphs deterministically.
+
+## Rules:
+
+* pure execution only
+* no interpretation logic
+* no access to raw text
+
+---
+
+# 3.9 DISCOURSESTATE MODULE (MEMORY)
+
+## Structure:
+
+```text id="disc_state"
+nodes:
+  Entity | Event | State | Process | Relation
+
+edges:
+  typed relations
+
+salience:
+  float weights
+
+temporal_index:
+  ordered history
+```
+
+## Rules:
+
+* only stores canonical outputs
+* low-salience decay applied
+* updated ONLY after execution
+
+---
+
+# 3.10 DISCOURSE POLICY KERNEL (DPK)
+
+## Purpose
+
+Controls conversational behavior ONLY.
+
+## Allowed:
+
+* explanation ordering
+* traversal preferences
+* ambiguity presentation style
+
+## Forbidden:
+
+* changing meaning
+* modifying CDL graphs
+* altering types
+
+---
+
+# 3.11 TRACE LOGGER (REQUIRED)
+
+Every execution MUST produce:
+
+```text id="trace"
+input
+resolved_types
+cdl_graph
+canonical_form
+mecp_decisions
+execution_output
+discourse_update
+```
+
+---
+
+# 4. SYSTEM CONTROL LAYER RULES
+
+## 4.1 MECP ALWAYS PREVAILS OVER EXPANSION
+
+No branch expansion without MECP approval.
+
+## 4.2 CANONICALIZATION BEFORE PRUNING
+
+Always normalize before MECP evaluation.
+
+## 4.3 DISCOURSE IS POST-EXECUTION ONLY
+
+No pre-execution memory influence allowed.
+
+---
+
+# 5. FAILURE HANDLING RULES
+
+If ambiguity is unresolved:
+
+1. Reduce abstraction level
+2. Decompose into simpler CDL primitives
+3. Apply MECP fallback selection
+4. If still unresolved → request missing context
+
+---
+
+# 6. PERSISTENCE MODEL
+
+## Persistent:
+
+* DiscourseState (canonical only)
+* validated CDL outputs
+
+## Transient:
+
+* interpretation branches
+* MECP evaluation trees
+* intermediate graphs
+
+---
+
+# 7. SYSTEM BOUNDARY RULE
+
+The system is:
+
+> a deterministic semantic execution engine with controlled memory and policy separation
+
+External environment:
+
+* MAY influence DiscourseState only
+* MUST NOT affect CDL or type system
+
+---
+
+# 8. IMPLEMENTATION PRIORITY ORDER
+
+Claude Code MUST implement in this order:
+
+1. types/
+2. cdl/
+3. parser/
+4. compiler/
+5. canonicalizer/
+6. mecp/
+7. executor/
+8. discourse/
+9. dpk/
+10. tracing/
+
+---
+
+# 9. MINIMAL VALID SYSTEM (MVP CHECK)
+
+System is valid ONLY if:
+
+* CDL graph executes deterministically
+* MECP prunes at least one branch correctly
+* DiscourseState updates post-execution
+* Canonicalization produces stable outputs
+* Trace logs are complete
+
+---
+
+# END OF BOOTSTRAP SPEC v1.0
+
+---
+
+## What you now have
+
+This is no longer a concept system.
+
+It is:
+
+> a **compile-ready deterministic semantic execution architecture specification**
+
+---
+
+## Next step (if you proceed)
+
+The next logical artifact is:
+
+> **File-by-file Claude Code build map (with exact class definitions + function signatures)**
+
+That is the point where implementation begins without architectural ambiguity.
+

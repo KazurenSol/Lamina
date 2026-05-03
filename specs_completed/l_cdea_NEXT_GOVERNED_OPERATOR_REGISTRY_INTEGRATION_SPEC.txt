@@ -1,0 +1,321 @@
+PROJECT: L-CDEA
+MODULE: operator_governance integration
+
+PURPOSE:
+Force all active operator resolution through the governed operator registry and add a cache-authority tamper validation test.
+
+This document extends the completed operator_governance/ module and locks the new DiscourseState authority invariant.
+
+---
+
+# STATUS
+
+Completed:
+- parser
+- router
+- planner
+- compiler
+- canonicalizer
+- MECP
+- execution
+- discourse
+- persistence
+- trace
+- data-backed operators
+- operator_governance package
+
+Known invariant now enforced:
+  DiscourseState is authoritative.
+  planner_cache is only a fast-path optimization.
+  If planner_cache and DiscourseState disagree, DiscourseState wins.
+
+---
+
+# PART 1 — CACHE AUTHORITY TAMPER TEST
+
+Add a manual or automated test proving planner_cache cannot override DiscourseState.
+
+Test name:
+  test_planner_cache_cannot_override_discourse_state
+
+Steps:
+
+1. Run:
+   python3 -m l_cdea.run "capital of France" --state-path /tmp/lcdea_state.json
+
+2. Confirm state file exists and stores:
+   CAPITAL_OF(France) = Paris
+
+3. Modify /tmp/lcdea_state.json planner_cache entry manually:
+   France → WrongCity
+
+4. Run:
+   python3 -m l_cdea.run "capital of France" --state-path /tmp/lcdea_state.json --trace
+
+Expected:
+
+- output = Paris
+- planner_cache value WrongCity is ignored or repaired
+- trace strategy includes discourse verification
+- final cache value restored to Paris
+- no execution rerun required if DiscourseState has authoritative value
+
+Hard invariant:
+  Serialized planner_cache metadata MUST NOT be able to override DiscourseState graph memory.
+
+---
+
+# PART 2 — GOVERNED REGISTRY AS AUTHORITY
+
+Current risk:
+Some operators may still be resolved directly from older OperatorRegistry or domain modules.
+
+Required fix:
+All operator resolution used by planner/execution MUST go through operator_governance.
+
+---
+
+# REQUIRED RESOLUTION PATH
+
+IntentFrame
+→ planner/operator_resolver.py
+→ governed registry lookup
+→ active GovernedOperator
+→ CDLOperator implementation
+→ graph construction
+
+The planner MUST NOT directly import domain operator objects.
+
+---
+
+# GOVERNED OPERATOR LOOKUP RULE
+
+operator key format:
+
+  domain.OPERATOR_NAME@version
+
+If no version is provided in IntentFrame:
+  use default active version for domain.OPERATOR_NAME
+
+Example:
+
+IntentFrame:
+  domain = "physics"
+  operator_name = "COMPUTE_ACCELERATION"
+
+Resolver:
+  resolves to:
+    physics.COMPUTE_ACCELERATION@1.0
+
+---
+
+# ACTIVE VERSION RULE
+
+operator_governance/registry.py MUST expose:
+
+get_active_operator(domain, name) -> GovernedOperator
+
+Rules:
+
+1. Only status == "active" may be returned.
+2. If multiple active versions exist, choose highest semantic version deterministically.
+3. Deprecated operators MUST NOT be returned.
+4. Candidate operators MUST NOT be returned.
+5. Missing operator raises OperatorNotFoundError.
+
+---
+
+# DOMAIN REGISTRATION PATCH
+
+Each domain module MUST register its operators through governance.
+
+Domains:
+- geography
+- math
+- physics
+- biology
+- finance
+- legal
+- programming
+- core operators
+
+Each domain SHOULD expose:
+
+register_governed_operators()
+
+This function registers all domain operators as GovernedOperator objects.
+
+Example:
+
+GovernedOperator {
+  name = "COMPUTE_ACCELERATION"
+  domain = "physics"
+  version = "1.0"
+  signature = TypeSignature(...)
+  implementation = CDLOperator(...)
+  metadata = {
+    deterministic: true,
+    side_effect_free: true
+  }
+  status = "active"
+}
+
+---
+
+# OPERATOR RESOLVER PATCH
+
+Patch:
+  l_cdea/core/planner/operator_resolver.py
+
+Current behavior may use:
+  OperatorRegistry.get(...)
+
+Required behavior:
+  operator_governance.get_active_operator(domain, operator_name)
+
+Then return:
+  governed_operator.implementation
+
+Planner trace MUST include:
+
+operator_governance_trace {
+  requested_domain
+  requested_operator
+  resolved_operator_key
+  resolved_version
+  status
+  governance_validated
+}
+
+---
+
+# EXECUTION SAFETY RULE
+
+Execution MUST reject graphs containing operators not registered as active governed operators.
+
+Add validation before execution:
+
+validate_graph_operators_are_governed(graph)
+
+Rules:
+1. Every operator node must map to active GovernedOperator.
+2. If not, raise ExecutionGovernanceError.
+3. Input/value-only nodes are exempt.
+
+---
+
+# BACKWARD COMPATIBILITY RULE
+
+During migration, existing OperatorRegistry MAY remain as a low-level storage mechanism, but it is no longer the authority.
+
+Authority order:
+
+1. operator_governance registry
+2. legacy OperatorRegistry only as implementation backend, if needed
+
+Planner/execution must treat governance registry as source of truth.
+
+---
+
+# HARD RULES
+
+1. No planner resolution may bypass operator_governance.
+2. Only active operators may execute.
+3. Candidate operators may be stored but not executed.
+4. Deprecated operators may be stored but not executed.
+5. Domain modules must register through governance.
+6. Version conflicts must be rejected.
+7. Duplicate active operator definitions must be rejected.
+8. Governance decisions must be trace-visible.
+9. Cache metadata must never override DiscourseState.
+10. All behavior must remain deterministic.
+
+---
+
+# FAILURE CASES
+
+Operator missing:
+  raise OperatorNotFoundError or PlanningError(OPERATOR_NOT_FOUND)
+
+Operator candidate:
+  reject as not executable
+
+Operator deprecated:
+  reject as not executable
+
+Ungoverned operator in execution graph:
+  raise ExecutionGovernanceError
+
+Planner cache/discourse mismatch:
+  return DiscourseState value and repair cache
+
+---
+
+# VALIDATION EXAMPLES
+
+Example 1 — normal governed resolution:
+
+Input:
+  calculate acceleration from force 10 N and mass 2 kg
+
+Expected:
+  operator_governance resolves physics.COMPUTE_ACCELERATION@1.0
+  output = {'value': 5.0, 'unit': 'm/s²'}
+
+---
+
+Example 2 — deprecated operator rejected:
+
+Mark:
+  math.ADD@1.0 status = deprecated
+
+Input graph uses math.ADD@1.0
+
+Expected:
+  execution rejects graph
+
+---
+
+Example 3 — candidate operator rejected:
+
+Register:
+  programming.FIND_FIRST@0.1 status = candidate
+
+Planner attempts to resolve FIND_FIRST.
+
+Expected:
+  rejected until approved/active
+
+---
+
+Example 4 — tampered planner cache:
+
+DiscourseState:
+  CAPITAL_OF(France)=Paris
+
+planner_cache metadata:
+  CAPITAL_OF(France)=WrongCity
+
+Expected:
+  output = Paris
+  cache repaired
+  trace indicates discourse authority
+
+---
+
+# IMPLEMENTATION PRIORITY
+
+1. Add cache tamper test
+2. Add get_active_operator(domain, name)
+3. Add governed domain registration hooks
+4. Patch planner/operator_resolver.py
+5. Add planner governance trace fields
+6. Add execution governance validator
+7. Patch execution engine to reject ungoverned operators
+8. Run all domain tests
+9. Run persistence/cache authority tests
+10. Run CLI smoke tests
+
+---
+
+# END OF SPEC

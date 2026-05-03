@@ -1,0 +1,17 @@
+{
+  "book_id": "52a27ecc9a654d6f",
+  "chapters_completed": 1,
+  "chapters_total": 2,
+  "chunks_processed": 2,
+  "chunks_total": 0,
+  "edges_added": 2,
+  "last_checkpoint": {
+    "book_id": "52a27ecc9a654d6f",
+    "chapter_id": "chap_60fc27702f11",
+    "chunk_index": 2,
+    "timestamp": 1
+  },
+  "nodes_added": 2,
+  "source_path": "/home/nestor/Desktop/Lamina/knowledge_seed/physics_book_v1.txt",
+  "status": "in_progress"
+}

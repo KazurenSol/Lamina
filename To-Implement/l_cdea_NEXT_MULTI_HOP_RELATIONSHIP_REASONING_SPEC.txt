@@ -1,0 +1,413 @@
+PROJECT: L-CDEA
+MODULE: discourse/multi_hop_reasoning/
+
+PURPOSE:
+Enable deterministic multi-hop traversal over DiscourseState relationship edges.
+
+Current behavior:
+  "what does force depend on"
+  → direct one-hop lookup:
+     force → acceleration
+     force → mass
+
+Desired behavior:
+  "what does force ultimately depend on"
+  → multi-hop traversal:
+     force → acceleration → velocity
+     force → mass
+
+This module moves L-CDEA from relationship retrieval to graph reasoning.
+
+---
+
+# POSITION IN PIPELINE
+
+Input
+→ Router
+→ Planner
+→ Multi-Hop Relationship Reasoning
+→ Output + Trace
+
+---
+
+# DIRECTORY STRUCTURE
+
+l_cdea/discourse/multi_hop_reasoning/
+├── __init__.py
+├── traversal.py
+├── operator.py
+├── patterns.py
+├── trace.py
+└── tests.py
+
+---
+
+# CORE OPERATOR
+
+GET_RELATIONSHIP_CLOSURE(term, relation_type, max_depth) -> Entity
+
+Example:
+
+GET_RELATIONSHIP_CLOSURE("force", "depends_on", 3)
+
+Returns:
+  direct and indirect dependency targets with paths.
+
+---
+
+# ROUTER PATTERNS
+
+Add patterns:
+
+1. "what does X ultimately depend on"
+2. "what does X indirectly depend on"
+3. "what are all dependencies of X"
+4. "show dependency chain for X"
+
+Route to:
+
+IntentFrame {
+  domain: "discourse"
+  operator_name: "GET_RELATIONSHIP_CLOSURE"
+  slots: {
+    "term": X,
+    "relation_type": "depends_on",
+    "max_depth": "3"
+  }
+  arg_order: ("term", "relation_type", "max_depth")
+}
+
+Priority:
+  multi-hop patterns = 195
+  relationship one-hop patterns = 190
+  definition patterns = 200
+
+---
+
+# TRAVERSAL RULES
+
+traversal.py:
+
+compute_closure(term, relation_type, discourse_state, max_depth)
+
+Rules:
+1. Use breadth-first search.
+2. Traverse only edges matching relation_type.
+3. Include direct and indirect targets.
+4. Prevent cycles with visited set.
+5. Respect max_depth.
+6. Sort output deterministically.
+
+---
+
+# RESULT TYPES
+
+RelationshipPath {
+  source: str
+  relation_type: str
+  target: str
+  depth: int
+  path: Tuple[str, ...]
+  provenance: Tuple[Provenance, ...]
+}
+
+RelationshipClosureResult {
+  source_term: str
+  relation_type: str
+  max_depth: int
+  paths: Tuple[RelationshipPath, ...]
+  fallback_used: bool
+}
+
+---
+
+# SORTING RULES
+
+Paths must be sorted by:
+
+1. depth ascending
+2. target value lexicographic
+3. path string lexicographic
+
+Example order:
+
+force → acceleration
+force → mass
+force → acceleration → velocity
+
+---
+
+# PROVENANCE RULES
+
+Each path MUST aggregate edge provenance.
+
+Path provenance:
+
+force → acceleration → velocity
+
+Includes:
+1. provenance from force → acceleration edge
+2. provenance from acceleration → velocity edge
+
+Display:
+- per path
+- show strongest provenance entry first
+
+---
+
+# CYCLE HANDLING
+
+If graph contains:
+
+A → B
+B → A
+
+Traversal MUST:
+1. avoid infinite loop
+2. record cycle_detected=True in trace
+3. return valid acyclic paths only
+
+---
+
+# OPERATOR BEHAVIOR
+
+GET_RELATIONSHIP_CLOSURE executes by:
+
+1. normalizing term
+2. normalizing relation_type
+3. parsing max_depth
+4. calling compute_closure
+5. returning RelationshipClosureResult
+
+If no paths found:
+
+return:
+  closure_of(term, relation_type)
+
+fallback_used=True
+
+---
+
+# PLANNER INTEGRATION
+
+Planner MUST support:
+
+domain = "discourse"
+operator = "GET_RELATIONSHIP_CLOSURE"
+
+Behavior:
+1. hydrate term as Entity
+2. hydrate relation_type as Entity
+3. hydrate max_depth as Entity or Constraint
+4. short-circuit closure lookup before graph build when possible
+5. cache only real hits
+6. fallback is NOT cache_hit
+
+---
+
+# GOVERNANCE INTEGRATION
+
+Register:
+
+discourse.GET_RELATIONSHIP_CLOSURE@1.0
+
+TypeSignature:
+  [Entity, Entity, Entity] → Entity
+
+metadata:
+  deterministic = true
+  side_effect_free = true
+
+---
+
+# TRACE REQUIREMENTS
+
+MultiHopTrace {
+  source_term
+  normalized_source
+  relation_type
+  max_depth
+  visited_nodes
+  paths
+  cycle_detected
+  fallback_used
+}
+
+Each path trace includes:
+  path
+  depth
+  provenance_count
+
+---
+
+# CLI OUTPUT FORMAT
+
+Input:
+  "what does force ultimately depend on"
+
+Output:
+
+[Entity] force ultimately depends_on:
+- acceleration
+  path: force → acceleration
+  [source: ... | chunk: ... | loc: ... | conf: ...]
+
+- mass
+  path: force → mass
+  [source: ... | chunk: ... | loc: ... | conf: ...]
+
+- velocity
+  path: force → acceleration → velocity
+  [source: ... | chunk: ... | loc: ... | conf: ...]
+
+If no result:
+
+[Entity] closure_of(force, depends_on)
+  [no provenance]
+
+---
+
+# HARD RULES
+
+1. Multi-hop reasoning MUST be deterministic.
+2. It MUST NOT modify DiscourseState.
+3. It MUST NOT modify CDL semantics.
+4. It MUST avoid infinite loops.
+5. It MUST respect max_depth.
+6. It MUST preserve provenance.
+7. It MUST be trace-visible.
+8. It MUST not use external services.
+9. It MUST not bypass governance.
+10. Fallback must not be cache_hit.
+
+---
+
+# VALIDATION EXAMPLES
+
+Example 1:
+
+Given:
+  force → depends_on → mass
+  force → depends_on → acceleration
+  acceleration → depends_on → velocity
+
+Input:
+  "what does force ultimately depend on"
+
+Expected:
+  acceleration
+  mass
+  velocity
+
+Paths:
+  force → acceleration
+  force → mass
+  force → acceleration → velocity
+
+---
+
+Example 2:
+
+Input:
+  "what does acceleration ultimately depend on"
+
+Expected:
+  velocity
+
+Path:
+  acceleration → velocity
+
+---
+
+Example 3 — cycle handling:
+
+Given:
+  A → depends_on → B
+  B → depends_on → A
+
+Input:
+  "what does A ultimately depend on"
+
+Expected:
+  returns B
+  cycle_detected=True
+  no infinite loop
+
+---
+
+Example 4 — max depth:
+
+Given:
+  A → B → C → D
+
+max_depth=2
+
+Expected:
+  B, C
+  not D
+
+---
+
+Example 5 — fallback:
+
+Input:
+  "what does entropy ultimately depend on"
+
+Expected:
+  closure_of(entropy, depends_on)
+  fallback_used=True
+  cache_hit=False
+
+---
+
+# IMPLEMENTATION PRIORITY
+
+1. discourse/multi_hop_reasoning/traversal.py
+2. discourse/multi_hop_reasoning/operator.py
+3. discourse/multi_hop_reasoning/patterns.py
+4. discourse/multi_hop_reasoning/trace.py
+5. discourse/multi_hop_reasoning/__init__.py
+6. patch router pattern loading
+7. patch planner short-circuit path
+8. register governed operator
+9. patch run.py output display
+10. add tests.py
+11. run CLI validation
+
+---
+
+# SUCCESS CRITERIA
+
+After ingesting:
+
+Force is mass times acceleration.
+Acceleration is the rate of change of velocity.
+
+Command:
+
+python3 -m l_cdea.run "what does force ultimately depend on" --trace
+
+Expected output includes:
+  acceleration
+  mass
+  velocity
+
+With paths and provenance displayed.
+
+---
+
+# DESIGN INTENT
+
+This module upgrades L-CDEA from:
+
+relationship retrieval
+
+to:
+
+relationship graph reasoning.
+
+It is the first step toward recursive semantic reasoning over learned knowledge.
+
+---
+
+# END OF SPEC

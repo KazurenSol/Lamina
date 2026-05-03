@@ -1,0 +1,25 @@
+Chapter 1: Motion Basics
+
+Velocity is displacement over time.
+
+Acceleration is the rate of change of velocity.
+
+Force is mass times acceleration.
+
+Mass is the amount of matter in an object.
+
+Force depends on mass and acceleration.
+
+Acceleration depends on velocity.
+
+Chapter 2: Energy Basics
+
+Kinetic energy is energy of motion.
+
+Potential energy is stored energy due to position.
+
+Energy is the capacity to do work.
+
+Kinetic energy depends on mass and velocity.
+
+Potential energy depends on mass, gravity, and height.

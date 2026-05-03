@@ -1,0 +1,334 @@
+PROJECT: L-CDEA
+MODULE: domain/math/
+
+PURPOSE:
+Provide a high-precision domain pack for symbolic manipulation, numerical computation, and formal equivalence reasoning.
+
+---
+
+# DOMAIN ROLE
+
+Math Domain V1 is designed to stress:
+
+1. Exact symbolic transformation
+2. Canonicalization correctness (CAS critical)
+3. Deep operator chaining
+4. Deterministic equivalence detection
+5. MECP efficiency under multiple valid solution paths
+6. Execution precision and reproducibility
+
+This domain is foundational and pairs extremely well with programming and physics.
+
+---
+
+# DIRECTORY STRUCTURE
+
+l_cdea/domain/math/
+├── __init__.py
+├── operators.py
+├── types.py
+├── algebra.py
+├── calculus.py
+├── equivalence_rules.py
+├── simplification.py
+├── compiler_bindings.py
+├── patterns.py
+├── examples.py
+└── tests.py
+
+---
+
+# MATH DOMAIN TYPES (mapped to core)
+
+Number
+  maps_to: Entity
+
+Variable
+  maps_to: Entity
+
+Expression
+  maps_to: Process
+
+Equation
+  maps_to: Constraint
+
+Function
+  maps_to: Process
+
+Set
+  maps_to: Entity
+
+Vector
+  maps_to: Entity
+
+Matrix
+  maps_to: Entity
+
+Operator
+  maps_to: Abstraction
+
+Inequality
+  maps_to: Constraint
+
+---
+
+# MATH OPERATORS V1
+
+# Arithmetic
+
+ADD(a, b) -> Number
+SUBTRACT(a, b) -> Number
+MULTIPLY(a, b) -> Number
+DIVIDE(a, b) -> Number
+POWER(base, exponent) -> Number
+
+# Algebra
+
+SIMPLIFY(expression) -> Expression
+EXPAND(expression) -> Expression
+FACTOR(expression) -> Expression
+SUBSTITUTE(expression, variable, value) -> Expression
+
+# Equation solving
+
+SOLVE(equation, variable) -> Set
+IS_EQUAL(a, b) -> Constraint
+COMPARE(a, b) -> Constraint
+
+# Functions
+
+DEFINE_FUNCTION(name, parameters, expression) -> Function
+EVALUATE_FUNCTION(function, input) -> Number
+
+# Calculus (basic V1)
+
+DERIVE(expression, variable) -> Expression
+INTEGRATE(expression, variable) -> Expression
+
+# Set operations
+
+UNION(setA, setB) -> Set
+INTERSECTION(setA, setB) -> Set
+CONTAINS(set, element) -> Constraint
+
+---
+
+# REQUIRED CORE OPERATOR MAPPINGS
+
+ADD
+= TRANSFORM(a + b)
+
+MULTIPLY
+= TRANSFORM(a * b)
+
+SIMPLIFY
+= TRANSFORM(expression)
+
+SOLVE
+= EXECUTE(solution process)
+
+SUBSTITUTE
+= TRANSFORM(variable replacement)
+
+COMPARE
+= VALIDATE relation
+
+EVALUATE_FUNCTION
+= EXECUTE(function)
+
+---
+
+# CANONICALIZATION RULES
+
+CAS MUST detect algebraic equivalence.
+
+Examples:
+
+a + b = b + a  (commutative)
+
+(a + b) + c = a + (b + c)  (associative)
+
+2 * (a + b) = 2a + 2b  (distributive)
+
+x^2 + 2x + 1 = (x + 1)^2
+
+a / b = a * b^-1
+
+Equivalent expressions MUST normalize to the same canonical signature.
+
+---
+
+# SIMPLIFICATION RULES
+
+SIMPLIFY MUST:
+
+1. Reduce expression complexity
+2. Preserve equivalence
+3. Apply canonical ordering
+4. Eliminate redundant operations
+
+Example:
+
+x + 0 → x  
+x * 1 → x  
+x * 0 → 0  
+
+---
+
+# MECP STRESS CASES
+
+Example 1:
+Task:
+  "Solve x^2 - 1 = 0"
+
+Possible graphs:
+  G1: factor then solve
+  G2: apply quadratic formula
+  G3: brute-force evaluation
+
+Expected MECP preference:
+  G1 (lowest cost)
+
+---
+
+Example 2:
+Task:
+  "Simplify expression"
+
+Possible graphs:
+  G1: apply simplification rules
+  G2: expand then reduce
+  G3: brute-force rewrite
+
+Expected MECP preference:
+  G1
+
+---
+
+Example 3:
+Task:
+  "Evaluate function at a point"
+
+Possible graphs:
+  G1: substitute and compute
+  G2: symbolic transformation then evaluate
+
+Expected MECP preference:
+  G1
+
+---
+
+# EXECUTION RULES
+
+1. All math operators MUST be deterministic
+2. No floating-point randomness in V1
+3. Exact symbolic results preferred over approximations
+4. Approximation must be explicit if used
+
+---
+
+# DISCOURSESTATE STORAGE RULES
+
+Math results may be stored as:
+
+- expressions
+- solved equations
+- function definitions
+- transformation patterns
+
+Example:
+
+Expression:
+  (x + 1)^2
+
+Equivalent:
+  x^2 + 2x + 1
+
+Stored as equivalence class
+
+---
+
+# OPERATOR DISCOVERY RULES
+
+System MAY propose new operators.
+
+Example:
+
+QUADRATIC_SOLVE
+=
+FACTOR + SOLVE
+
+or
+
+QUADRATIC_FORMULA
+
+Must meet standard validation requirements.
+
+---
+
+# INITIAL VALIDATION EXAMPLES
+
+Example 1:
+Input:
+  "Simplify x + 0"
+
+Expected:
+  x
+
+---
+
+Example 2:
+Input:
+  "Solve x^2 - 1 = 0"
+
+Expected:
+  x = 1, -1
+
+---
+
+Example 3:
+Input:
+  "Evaluate f(x)=x^2 at x=3"
+
+Expected:
+  9
+
+---
+
+Example 4:
+Input:
+  "Expand (x+1)^2"
+
+Expected:
+  x^2 + 2x + 1
+
+---
+
+# HARD RULES
+
+1. Math domain MUST NOT alter CDL semantics
+2. Math domain MUST enforce equivalence rules
+3. Math domain MUST remain deterministic
+4. Math domain MUST not bypass CAS
+5. Math domain MUST not bypass MECP
+6. Math domain MUST not use approximate computation unless explicit
+7. Math domain MAY propose operators but MUST NOT auto-register
+8. Math domain MUST maintain canonical representations
+
+---
+
+# IMPLEMENTATION PRIORITY
+
+1. domain/math/types.py
+2. domain/math/operators.py
+3. domain/math/algebra.py
+4. domain/math/simplification.py
+5. domain/math/equivalence_rules.py
+6. domain/math/compiler_bindings.py
+7. domain/math/patterns.py
+8. domain/math/examples.py
+9. domain/math/tests.py
+
+---
+
+# END OF SPEC

@@ -1,0 +1,310 @@
+PROJECT: L-CDEA
+MODULE: discourse/persistence/
+
+PURPOSE:
+Add deterministic persistent storage for DiscourseState so cache hits, learned semantic results, dataset-backed outputs, and memory graph entries survive separate Python process invocations.
+
+Current V1 behavior:
+  DiscourseState/cache is in-memory only.
+  Cache hit works inside one process or REPL.
+  Separate CLI calls start with empty memory.
+
+Desired behavior:
+  python3 -m l_cdea.run "capital of France"
+  python3 -m l_cdea.run "capital of France"
+
+Second invocation should load prior DiscourseState and return cache_hit=true.
+
+---
+
+# PIPELINE POSITION
+
+Input
+→ Parser
+→ Router
+→ Planner
+→ Execution
+→ DiscourseState
+→ Persistence Save
+
+Startup:
+Persistent Storage
+→ DiscourseState Load
+→ Pipeline
+
+---
+
+# DIRECTORY STRUCTURE
+
+l_cdea/discourse/
+├── storage.py
+├── schema.py
+└── persistence_tests.py
+
+Existing discourse files MUST remain compatible.
+
+---
+
+# CORE TYPES
+
+PersistentDiscourseSnapshot {
+  schema_version: str
+  created_by: str
+  snapshot_id: str
+  nodes: List[SerializedDiscourseNode]
+  edges: List[SerializedDiscourseEdge]
+  temporal_index: List[SerializedTemporalEvent]
+  metadata: Dict
+}
+
+SerializedDiscourseNode {
+  id: str
+  semantic_type: str
+  value: Any
+  salience: float
+  created_at: int
+  updated_at: int
+  provenance: Dict
+  canonical_signature: Optional[str]
+}
+
+SerializedDiscourseEdge {
+  source_id: str
+  target_id: str
+  relation_type: str
+  salience: float
+  provenance: Dict
+}
+
+---
+
+# FILE RESPONSIBILITIES
+
+## schema.py
+
+Defines:
+- SCHEMA_VERSION
+- snapshot dataclasses or typed dict helpers
+- serialization validation rules
+
+Required:
+  SCHEMA_VERSION = "1.0"
+
+---
+
+## storage.py
+
+Defines:
+
+save_state(state, path) -> PersistentDiscourseSnapshot
+
+load_state(path) -> DiscourseState
+
+snapshot_id(state) -> str
+
+state_to_snapshot(state) -> PersistentDiscourseSnapshot
+
+snapshot_to_state(snapshot) -> DiscourseState
+
+---
+
+# DETERMINISTIC SERIALIZATION RULES
+
+1. JSON serialization MUST use sort_keys=True.
+2. Nodes MUST be sorted by stable node id.
+3. Edges MUST be sorted by (source_id, target_id, relation_type).
+4. Temporal events MUST preserve temporal order.
+5. snapshot_id MUST be deterministic.
+6. Saving same state twice MUST produce identical file bytes.
+
+Recommended snapshot_id:
+
+stable_hash(
+  schema_version +
+  sorted serialized nodes +
+  sorted serialized edges +
+  temporal index
+)
+
+Do NOT use uuid4().
+Do NOT use wall-clock timestamps in snapshot identity.
+
+---
+
+# STORAGE PATH RULES
+
+Default path:
+
+.l_cdea/discourse_state.json
+
+Rules:
+1. Path may be overridden by CLI flag:
+   --state-path path/to/state.json
+2. If file does not exist, start with empty DiscourseState.
+3. After successful query execution/discourse update, save state.
+4. On failure before discourse update, do not overwrite prior valid state.
+
+---
+
+# RUN.PY INTEGRATION
+
+Patch run.py:
+
+At startup:
+1. Resolve state path:
+   default ".l_cdea/discourse_state.json"
+   or CLI --state-path
+2. Load DiscourseState if path exists
+3. Use loaded state for planner cache lookup and discourse update
+
+After successful run_query:
+1. Save updated DiscourseState to state path
+2. If --trace, trace must include:
+   - state_loaded
+   - state_path
+   - snapshot_id_before
+   - snapshot_id_after
+   - state_saved
+
+For REPL mode:
+- load once at startup
+- save after every successful query
+
+---
+
+# CLI BEHAVIOR
+
+Example:
+
+python3 -m l_cdea.run "capital of France" --trace
+
+Expected first run:
+  cache_hit=false
+  output=Paris
+  state_saved=true
+
+Expected second run:
+  cache_hit=true
+  output=Paris
+  execution skipped
+  state_loaded=true
+
+---
+
+# HARD RULES
+
+1. Persistence MUST NOT modify CDL semantics.
+2. Persistence MUST NOT affect parser/router/planner decisions except through loaded DiscourseState.
+3. Persistence MUST be deterministic.
+4. Persistence MUST preserve provenance.
+5. Persistence MUST preserve salience.
+6. Persistence MUST preserve temporal index.
+7. Persistence MUST never overwrite valid state after failed execution.
+8. Persistence MUST support empty-state startup.
+9. Persistence MUST use versioned schema.
+10. Persistence MUST not require external services.
+
+---
+
+# FAILURE HANDLING
+
+If state file is missing:
+  return empty DiscourseState
+
+If state file is corrupt:
+  raise PersistenceError
+  do not overwrite file
+
+If schema_version unsupported:
+  raise SchemaVersionError
+
+If save fails:
+  raise PersistenceError
+  do not claim state_saved=true
+
+---
+
+# TRACE REQUIREMENTS
+
+Add persistence trace payload:
+
+PersistenceTrace {
+  state_path
+  state_loaded
+  state_saved
+  snapshot_id_before
+  snapshot_id_after
+  node_count_before
+  node_count_after
+  edge_count_before
+  edge_count_after
+}
+
+---
+
+# VALIDATION EXAMPLES
+
+Example 1 — cross-process cache hit:
+
+Command 1:
+  python3 -m l_cdea.run "capital of France" --state-path /tmp/lcdea_state.json --trace
+
+Expected:
+  cache_hit=false
+  output=Paris
+  state_saved=true
+
+Command 2:
+  python3 -m l_cdea.run "capital of France" --state-path /tmp/lcdea_state.json --trace
+
+Expected:
+  cache_hit=true
+  output=Paris
+  execution skipped
+
+---
+
+Example 2 — deterministic save:
+
+Run:
+  save_state(state, path_a)
+  save_state(state, path_b)
+
+Expected:
+  file bytes identical
+
+---
+
+Example 3 — empty startup:
+
+No state file exists.
+
+Expected:
+  load_state(path) returns empty DiscourseState
+  no crash
+
+---
+
+Example 4 — corrupt file:
+
+State file contains invalid JSON.
+
+Expected:
+  PersistenceError
+  no overwrite
+
+---
+
+# IMPLEMENTATION PRIORITY
+
+1. discourse/schema.py
+2. discourse/storage.py
+3. discourse/persistence_tests.py
+4. patch discourse/__init__.py exports
+5. patch run.py with --state-path
+6. patch trace to include PersistenceTrace
+7. run cross-process CLI validation
+
+---
+
+# END OF SPEC

@@ -1,0 +1,77 @@
+PROJECT: L-CDEA
+MODULE: core/operators (FOUNDATION EXTENSION)
+
+PURPOSE:
+Define the minimal universal operator library (CORE_OPS_V1).
+
+---
+
+# CORE OPERATOR SET (V1)
+
+CORE_OPS_V1 = {
+
+  // Identity / structure
+  CREATE,
+  DELETE,
+  DEFINE,
+  CLASSIFY,
+  VALIDATE,
+
+  // Collection operations
+  CONTAIN,
+  LOOKUP,
+  SELECT,
+  FILTER,
+  MAP,
+  REDUCE,
+  SORT,
+  GROUP,
+  COUNT,
+
+  // Relation operations
+  CONNECT,
+  DISCONNECT,
+  COMPARE,
+  MATCH,
+
+  // Transformation
+  TRANSFORM,
+  MERGE,
+  SPLIT,
+  CONVERT,
+
+  // Control / execution
+  EXECUTE,
+  QUERY,
+  RETURN,
+
+  // Observation / measurement
+  OBSERVE,
+  MEASURE
+}
+
+---
+
+# HARD RULES
+
+1. Operators MUST be deterministic
+2. Operators MUST define TypeSignature
+3. Operators MUST NOT overlap semantically
+4. Operators MUST be composable in CDL graphs
+
+---
+
+# OPERATOR REGISTRATION RULE
+
+Operator MAY be added ONLY if:
+
+1. Valid TypeSignature exists
+2. Deterministic behavior
+3. No duplication
+4. Reduces repeated graph patterns
+5. Improves MECP efficiency
+6. Versioned and validated
+
+---
+
+END OF SPEC

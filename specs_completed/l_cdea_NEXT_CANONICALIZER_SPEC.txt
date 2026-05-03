@@ -1,0 +1,208 @@
+PROJECT: L-CDEA (Lamina CDL–Discourse Execution Architecture)
+MODULE: normalization/canonicalizer/
+
+STATUS:
+core/compiler/ COMPLETE + VERIFIED
+Output: over-generated CDLGraph set (MECP-ready semantic space)
+
+---
+
+# PURPOSE OF THIS MODULE
+
+The canonicalizer is the **structural equivalence engine**.
+
+It takes:
+CompiledOutput (multiple CDLGraphs + bindings + interpretations)
+
+→ produces:
+CanonicalGraphSet (normalized, deduplicated semantic space)
+
+---
+
+# POSITION IN PIPELINE
+
+Input →
+Parser →
+Compiler →
+CAS (Canonicalizer) →
+MECP →
+Executor →
+DiscourseState →
+Trace
+
+---
+
+# HARD INVARIANTS
+
+1. Canonicalizer MUST be pure (no mutation of input graphs)
+2. Canonicalizer MUST preserve semantic equivalence classes
+3. Canonicalizer MUST NOT remove valid interpretations (only merge equivalents)
+4. Canonicalizer MUST be deterministic
+5. Canonicalizer MUST NOT access MECP or DiscourseState
+6. Canonicalization MUST complete BEFORE MECP execution
+
+---
+
+# DIRECTORY STRUCTURE
+
+l_cdea/core/normalization/canonicalizer/
+│
+├── __init__.py
+├── equivalence.py
+├── normalize.py
+├── merge.py
+├── signature.py
+└── exceptions.py
+
+---
+
+# 1. equivalence.py — GRAPH EQUIVALENCE ENGINE
+
+PURPOSE:
+Determine structural equivalence between CDLGraphs.
+
+RULES:
+Two graphs are equivalent if:
+- operator sequences are isomorphic under canonical renaming
+- TypeSignatures match exactly
+- edge directionality preserved
+- terminal values structurally identical
+
+OUTPUT:
+EquivalenceClassID
+
+---
+
+# 2. signature.py — CANONICAL GRAPH SIGNATURES
+
+PURPOSE:
+Convert CDLGraph → hashable structural signature
+
+RULES:
+- uses operator identity (from cached operator registry)
+- uses type signatures only (no runtime values)
+- ignores insertion order (must use topological normalization)
+- must be deterministic across runs
+
+OUTPUT:
+CanonicalSignature (hashable)
+
+---
+
+# 3. normalize.py — GRAPH NORMALIZATION LAYER
+
+PURPOSE:
+Convert equivalent graphs into a canonical structural form.
+
+RULES:
+- reorder commutative operations (if defined)
+- normalize argument ordering
+- standardize operator chains
+- flatten redundant intermediate nodes
+
+OUTPUT:
+NormalizedCDLGraph
+
+---
+
+# 4. merge.py — EQUIVALENCE COLLAPSE ENGINE
+
+PURPOSE:
+Merge structurally equivalent graphs into equivalence classes.
+
+RULES:
+- does NOT delete graphs
+- creates equivalence groups
+- preserves all interpretations as members of class
+
+OUTPUT:
+CanonicalGraphSet {
+    equivalence_classes: Dict[CanonicalSignature, List[CDLGraph]]
+}
+
+---
+
+# 5. exceptions.py
+
+DEFINE:
+
+class CanonicalizationError(Exception):
+    pass
+
+class EquivalenceDetectionError(CanonicalizationError):
+    pass
+
+class NormalizationError(CanonicalizationError):
+    pass
+
+---
+
+# OUTPUT CONTRACT
+
+Canonicalizer MUST return:
+
+CanonicalizationResult {
+    canonical_graphs: CanonicalGraphSet,
+    signatures: List[CanonicalSignature],
+    equivalence_map: Dict[CanonicalSignature, List[CDLGraph]]
+}
+
+---
+
+# CRITICAL DESIGN RULES
+
+## 1. Canonicalization is STRUCTURAL ONLY
+No semantic interpretation allowed.
+
+## 2. No MECP influence
+Do not prune based on cost or usefulness.
+
+## 3. No DiscourseState access
+Memory is strictly forbidden here.
+
+## 4. No execution of graphs
+Graphs remain inert objects.
+
+## 5. No loss of information
+All original graphs must remain recoverable via equivalence mapping.
+
+---
+
+# DESIGN INTENT
+
+The canonicalizer exists to:
+
+> eliminate structural redundancy while preserving full semantic possibility space
+
+It transforms:
+over-generated graph space
+→
+minimal unique structural basis set
+
+---
+
+# FAILURE MODE RULES
+
+INVALID if canonicalizer:
+- removes interpretations entirely
+- ranks graphs by quality
+- merges non-isomorphic structures
+- introduces probabilistic scoring
+- executes CDL nodes
+
+---
+
+# NEXT MODULE
+
+After completion proceed to:
+
+control/mecp/
+
+Which will:
+- prune canonical graph space
+- evaluate cost vs information gain
+- determine execution subset for runtime
+
+---
+
+END OF SPEC

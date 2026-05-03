@@ -1,0 +1,287 @@
+PROJECT: L-CDEA (Lamina CDL–Discourse Execution Architecture)
+MODULE: execution/
+
+STATUS:
+control/mecp/ COMPLETE + VERIFIED
+Input: ExecutionSubset + ExecutionQueue (ordered canonical CDLGraphs)
+Output: ExecutionBundle + DiscourseUpdateBundle
+
+---
+
+# 🔧 CORRECTIONS FROM PREVIOUS IMPLEMENTATION (MANDATORY PATCH NOTES)
+
+These corrections MUST be applied to any prior interpretation of the execution layer.
+
+---
+
+## CORRECTION 1 — TOP-LEVEL EXECUTION IS STRICTLY MECP-ORDERED
+
+PREVIOUS AMBIGUITY:
+Execution could be interpreted as allowing internal graph reordering.
+
+FIX:
+Execution MUST respect MECP ExecutionQueue order globally AND locally.
+
+NEW INVARIANT:
+- Graph order: MECP-defined only
+- Node order: topological only
+- No dynamic re-ranking permitted
+
+---
+
+## CORRECTION 2 — NODE RESOLUTION MUST BE STRICTLY SINGLE-PASS
+
+PREVIOUS RISK:
+Implicit multi-pass evaluation or iterative refinement.
+
+FIX:
+Each node is evaluated exactly once.
+
+NEW INVARIANT:
+- No re-evaluation of nodes
+- No iterative convergence loops
+- No fixpoint approximation
+
+---
+
+## CORRECTION 3 — FAILURE HANDLING IS ISOLATED PER GRAPH
+
+PREVIOUS GAP:
+Failure propagation could leak across graphs.
+
+FIX:
+Failures are contained per graph execution context.
+
+NEW INVARIANT:
+- Graph failure does NOT invalidate other graphs
+- Execution continues unless MECP subset is empty
+
+---
+
+## CORRECTION 4 — TYPE RESOLUTION IS READ-ONLY AT EXECUTION TIME
+
+PREVIOUS RISK:
+Re-validation or reinterpretation of types during execution.
+
+FIX:
+TypeSignature is enforced, not recomputed.
+
+NEW INVARIANT:
+- No re-invocation of type system logic
+- Only validation against precompiled signatures
+
+---
+
+## CORRECTION 5 — DISCOURSE IS STRICT POST-PROCESS ONLY
+
+PREVIOUS AMBIGUITY:
+Implied potential incremental updates.
+
+FIX:
+DiscourseState updates happen ONLY after full graph execution completes.
+
+NEW INVARIANT:
+- No streaming updates
+- No partial memory writes
+
+---
+
+# PURPOSE OF THIS MODULE
+
+The execution layer is the **semantic realization engine**.
+
+It takes selected CDL graphs and:
+- executes operator transformations
+- resolves typed values
+- produces concrete semantic outcomes
+- prepares updates for DiscourseState
+
+This is the FIRST layer where:
+> abstract semantic structure becomes computed result
+
+---
+
+# POSITION IN PIPELINE
+
+Input →
+Parser →
+Compiler →
+CAS →
+MECP →
+EXECUTION →
+DiscourseState →
+Trace
+
+---
+
+# HARD INVARIANTS (UPDATED FINAL FORM)
+
+1. Execution MUST be deterministic
+2. Execution MUST follow MECP global order strictly
+3. Execution MUST NOT reorder graphs or nodes dynamically
+4. Execution MUST be single-pass per node
+5. Execution MUST isolate failures per graph
+6. Execution MUST NOT modify CDL structures
+7. Execution MUST NOT re-run MECP or CAS logic
+8. Execution MUST NOT access Parser or Compiler layers
+9. Execution MUST defer ALL Discourse updates until completion
+
+---
+
+# DIRECTORY STRUCTURE
+
+l_cdea/execution/
+│
+├── __init__.py
+├── runtime.py
+├── evaluator.py
+├── resolver.py
+├── engine.py
+└── exceptions.py
+
+---
+
+# 1. runtime.py — EXECUTION CONTEXT
+
+PURPOSE:
+Isolated per-graph execution sandbox.
+
+RULES:
+- no shared mutable state between graphs
+- no persistence across executions
+- deterministic context initialization only
+
+OUTPUT:
+ExecutionContext
+
+---
+
+# 2. evaluator.py — OPERATOR EXECUTION LAYER
+
+PURPOSE:
+Execute CDLOperators within nodes.
+
+RULES:
+- strict TypeSignature validation (no recomputation)
+- deterministic operator invocation
+- single-pass evaluation only
+
+OUTPUT:
+EvaluatedNode
+
+---
+
+# 3. resolver.py — DEPENDENCY RESOLUTION ENGINE
+
+PURPOSE:
+Resolve node execution order inside a graph.
+
+RULES:
+- topological sort only
+- no dynamic graph modification
+- assumes DAG integrity from MECP + CAS
+
+OUTPUT:
+ResolvedExecutionOrder
+
+---
+
+# 4. engine.py — GRAPH EXECUTION ORCHESTRATOR
+
+PURPOSE:
+Coordinate full execution lifecycle.
+
+RULES:
+- processes graphs in MECP order only
+- executes nodes in resolved topological order
+- collects outputs per graph
+- isolates failures per graph
+- aggregates results after completion
+
+OUTPUT:
+ExecutionBundle
+
+---
+
+# 5. exceptions.py
+
+DEFINE:
+
+class ExecutionError(Exception):
+    pass
+
+class RuntimeEvaluationError(ExecutionError):
+    pass
+
+class ResolutionError(ExecutionError):
+    pass
+
+class ContextIsolationError(ExecutionError):
+    pass
+
+class MECPOrderViolationError(ExecutionError):
+    pass
+
+---
+
+# OUTPUT CONTRACT
+
+Execution MUST return:
+
+ExecutionBundle {
+    results: ExecutionResultSet,
+    resolved_graphs: List[CDLGraph],
+    node_outputs: Dict[NodeID, TypedValue],
+    failures: Dict[GraphID, List[ExecutionError]],
+    success_flags: Dict[GraphID, bool]
+}
+
+---
+
+# CRITICAL DESIGN RULES (FINAL CONSOLIDATED)
+
+## 1. Execution is PURE REALIZATION
+No interpretation or selection allowed.
+
+## 2. Execution is STRICTLY ORDERED
+MECP order is globally binding.
+
+## 3. Execution is SINGLE PASS
+No retries or iterative refinement.
+
+## 4. Execution is ISOLATED
+Graph failures do not contaminate others.
+
+## 5. Execution is POST-COMPUTE ONLY
+Discourse updates occur after full completion.
+
+---
+
+# SYSTEM INTENT
+
+Execution exists to:
+
+> deterministically materialize MECP-selected semantic structures into resolved typed outputs without altering their structure
+
+It is the system’s:
+- realization layer
+- computation finalizer
+- pre-memory transformation stage
+
+---
+
+# NEXT MODULE
+
+After completion proceed to:
+
+discourse/
+
+Which will:
+- persist execution results
+- maintain semantic memory graph
+- manage salience + temporal decay
+- integrate outputs into long-term system state
+
+---
+
+END OF SPEC

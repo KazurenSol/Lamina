@@ -1,0 +1,318 @@
+PROJECT: L-CDEA
+MODULE: ingestion/relationships/
+
+PURPOSE:
+Extract deterministic semantic relationships from ingested text and store them as first-class edges in DiscourseState, enabling multi-hop reasoning over previously ingested knowledge.
+
+Current state:
+- Definitions are ingested, validated, persisted, and retrievable.
+- No explicit relationships are stored between entities.
+
+Desired behavior:
+From text like:
+  "Force is mass times acceleration."
+  "Acceleration is the rate of change of velocity."
+Extract and store relationships:
+  Force → depends_on → mass
+  Force → depends_on → acceleration
+  Acceleration → depends_on → velocity
+
+---
+
+# POSITION IN PIPELINE
+
+Document Input
+→ Chunking
+→ Ingestion Router
+→ Extractors (definitions / claims / procedures / examples / formulas)
+→ Relationship Extraction (THIS MODULE)
+→ Provenance
+→ Validation
+→ DiscourseState (nodes + edges)
+→ Persistence
+
+---
+
+# DIRECTORY STRUCTURE
+
+l_cdea/ingestion/relationships/
+├── __init__.py
+├── patterns.py
+├── extractor.py
+├── normalizer.py
+├── edge_builder.py
+├── trace.py
+└── tests.py
+
+---
+
+# CORE TYPES
+
+RelationshipEdge {
+  source_term: str
+  relation_type: str
+  target_term: str
+  confidence: float
+  provenance: Provenance
+}
+
+RelationshipExtractionResult {
+  edges: Tuple[RelationshipEdge, ...]
+}
+
+---
+
+# SUPPORTED RELATION TYPES (V1)
+
+depends_on
+is_a
+part_of
+causes
+related_to (fallback)
+
+---
+
+# PATTERN RULES
+
+patterns.py defines deterministic patterns.
+
+Examples:
+
+1. "X is Y"
+   → X is_a Y
+
+2. "X is a Y"
+   → X is_a Y
+
+3. "X is defined as Y"
+   → X is_a Y
+
+4. "X is Y times Z"
+   → X depends_on Y
+   → X depends_on Z
+
+5. "X is the rate of change of Y"
+   → X depends_on Y
+
+6. "X consists of Y and Z"
+   → X depends_on Y
+   → X depends_on Z
+
+7. "X uses Y"
+   → X depends_on Y
+
+Fallback:
+  if no pattern match → no relationship extracted
+
+---
+
+# NORMALIZATION
+
+normalizer.py:
+
+normalize_term(term):
+
+Rules:
+1. lowercase
+2. strip punctuation
+3. trim whitespace
+4. collapse whitespace
+5. no stemming in V1
+
+---
+
+# EXTRACTION LOGIC
+
+extractor.py:
+
+extract_relationships(chunk_text, metadata, provenance)
+
+Steps:
+
+1. normalize text
+2. match patterns
+3. extract subject (X) and objects (Y, Z, ...)
+4. generate RelationshipEdge(s)
+5. attach provenance
+
+Multiple edges may be produced per chunk.
+
+---
+
+# EDGE BUILDING
+
+edge_builder.py:
+
+build_edges(edges, discourse_state)
+
+Rules:
+
+1. source and target must exist as nodes (create if missing)
+2. create edge:
+   source_node → relation_type → target_node
+3. deduplicate edges:
+   same source + relation + target → merge provenance
+4. update salience
+5. maintain deterministic ordering
+
+---
+
+# DISCOURSESTATE INTEGRATION
+
+DiscourseEdge {
+  source_id
+  target_id
+  relation_type
+  provenance: Tuple[Provenance, ...]
+  salience
+}
+
+Rules:
+1. edges MUST be stored persistently
+2. edges MUST support provenance merging
+3. edges MUST NOT overwrite conflicting edges
+
+---
+
+# PROVENANCE REQUIREMENTS
+
+Each relationship MUST include:
+
+source_path
+chunk_id
+location
+extraction_method = "relationship_extractor"
+confidence
+trace_id
+timestamp_index
+
+---
+
+# VALIDATION INTEGRATION
+
+Relationship edges MUST pass validation:
+
+- duplicates → merge
+- conflicts → flag
+- low confidence → reject
+
+Reuse ingestion/validation module.
+
+---
+
+# TRACE REQUIREMENTS
+
+trace.py:
+
+RelationshipTrace {
+  chunk_text
+  matched_pattern
+  extracted_edges
+  normalized_terms
+}
+
+Trace MUST show:
+- which pattern fired
+- what edges were created
+
+---
+
+# HARD RULES
+
+1. Extraction MUST be deterministic.
+2. No ML models in V1.
+3. No external APIs.
+4. No fuzzy matching in V1.
+5. Terms MUST be normalized consistently.
+6. Edges MUST NOT overwrite conflicting knowledge.
+7. Provenance MUST be preserved.
+8. Duplicate edges MUST merge provenance.
+9. Extraction MUST be pattern-driven only.
+10. System MUST remain stable if no relationships found.
+
+---
+
+# VALIDATION EXAMPLES
+
+Example 1:
+
+Input:
+  "Force is mass times acceleration."
+
+Expected:
+  Force → depends_on → mass
+  Force → depends_on → acceleration
+
+---
+
+Example 2:
+
+Input:
+  "Acceleration is the rate of change of velocity."
+
+Expected:
+  Acceleration → depends_on → velocity
+
+---
+
+Example 3:
+
+Input:
+  "A car is a vehicle."
+
+Expected:
+  car → is_a → vehicle
+
+---
+
+Example 4:
+
+Input:
+  "Velocity."
+
+Expected:
+  no relationships
+
+---
+
+# IMPLEMENTATION PRIORITY
+
+1. ingestion/relationships/patterns.py
+2. ingestion/relationships/normalizer.py
+3. ingestion/relationships/extractor.py
+4. ingestion/relationships/edge_builder.py
+5. integrate into knowledge_importer.py
+6. add trace support
+7. tests.py
+8. run ingestion + retrieval validation
+
+---
+
+# SUCCESS CRITERIA
+
+After ingesting:
+
+"Force is mass times acceleration."
+
+Query:
+
+"What does force depend on?"
+
+Expected:
+  mass
+  acceleration
+
+---
+
+# DESIGN INTENT
+
+Move from static definitions to relational knowledge.
+
+This enables:
+- graph reasoning
+- dependency queries
+- multi-hop inference
+
+---
+
+# END OF SPEC

@@ -1,0 +1,389 @@
+PROJECT: L-CDEA
+MODULE: core/planner/
+
+PURPOSE:
+Provide a deterministic Query Planner that bridges routed intent and executable semantics.
+
+The planner consumes a RouteResult (from router) and produces a QueryPlan that either:
+(a) returns a cache hit from DiscourseState (no execution), or
+(b) constructs a minimal, ready-to-execute CDLGraph using a resolved operator and hydrated slots.
+
+The planner is responsible for:
+1. Discourse-first lookup (avoid recomputation)
+2. Slot hydration (string → TypedValue)
+3. Operator resolution (domain.OPERATOR_NAME → CDLOperator)
+4. Type validation (against TypeSignature)
+5. Minimal graph construction (no MECP here)
+6. Provenance preservation for traceability
+
+The planner MUST NOT:
+- execute operators
+- call MECP
+- mutate DiscourseState
+- alter CDL semantics
+
+---
+
+# PIPELINE POSITION
+
+Input
+→ Parser
+→ Router
+→ Planner        ← (THIS MODULE)
+→ Compiler (optional for fallback)
+→ CAS
+→ MECP
+→ Execution
+→ DiscourseState
+→ Trace Logger
+
+Notes:
+- For routed intents, Planner may bypass generic compiler graph construction by emitting a minimal graph directly.
+- For fallback intents, Planner forwards to Compiler path.
+
+---
+
+# DIRECTORY STRUCTURE
+
+l_cdea/core/planner/
+├── __init__.py
+├── plan.py
+├── discourse_lookup.py
+├── slot_hydrator.py
+├── operator_resolver.py
+├── graph_builder.py
+└── tests.py
+
+---
+
+# TYPES
+
+## QueryPlan
+
+QueryPlan {
+  intent: IntentFrame
+  cache_hit: bool
+
+  # If cache_hit == True
+  cached_result: Optional[TypedValue]
+  cache_trace: Dict
+
+  # If cache_hit == False
+  operator: Optional[CDLOperator]
+  hydrated_slots: Dict[str, TypedValue]
+  graph: Optional[CDLGraph]
+
+  # Metadata
+  provenance: Dict
+  errors: Tuple[PlanningError, ...]
+}
+
+## PlanningError
+
+PlanningError {
+  code: str
+  message: str
+  details: Dict
+}
+
+Error codes (non-exhaustive):
+- OPERATOR_NOT_FOUND
+- SLOT_HYDRATION_FAILED
+- TYPE_MISMATCH
+- DISCOURSE_LOOKUP_FAILED
+- GRAPH_BUILD_FAILED
+
+## DiscourseLookupResult
+
+DiscourseLookupResult {
+  hit: bool
+  value: Optional[TypedValue]
+  checked_keys: Tuple[str, ...]
+  match_strategy: str  # e.g., "relation_lookup", "pattern_lookup"
+}
+
+---
+
+# RULES
+
+## 1. DISCOURSE-FIRST LOOKUP (MANDATORY)
+
+Planner MUST check DiscourseState before any graph construction.
+
+Process:
+1. Derive lookup keys from IntentFrame:
+   - (domain, operator_name, normalized_slots)
+2. Query DiscourseState via discourse_lookup.py
+3. If hit:
+   - return QueryPlan(cache_hit=True, cached_result=...)
+   - DO NOT build graph
+   - DO NOT resolve operator
+4. If miss:
+   - continue to hydration and resolution
+
+Determinism:
+- Same intent + same DiscourseState → same hit/miss
+
+---
+
+## 2. SLOT HYDRATION
+
+slot_hydrator.py converts string slots → TypedValue
+
+Rules:
+1. MUST be deterministic
+2. MUST be domain-aware
+3. MUST NOT infer unstated facts
+4. MUST fail cleanly if required slot cannot be parsed
+
+Examples:
+
+Generic:
+  "France" → TypedValue("France", ENTITY)
+
+Physics:
+  "10 N" → TypedValue({"value": 10, "unit": "N"}, ENTITY)
+
+Math:
+  "x + 1" → TypedValue("x + 1", ENTITY)  # symbolic string in V1
+
+Programming:
+  "[1,2,3]" → TypedValue([1,2,3], ENTITY)
+
+Hydrator dispatch:
+- Based on intent.domain
+- Each domain MAY provide a hydration hook
+
+---
+
+## 3. OPERATOR RESOLUTION
+
+operator_resolver.py MUST:
+
+1. Build operator key:
+   f"{domain}.{operator_name}"
+
+2. Lookup in OperatorRegistry
+
+3. If not found:
+   - raise PlanningError(OPERATOR_NOT_FOUND)
+
+4. Validate TypeSignature:
+   - match number and types of inputs
+   - if mismatch:
+     - raise PlanningError(TYPE_MISMATCH)
+
+No operator creation.
+No fallback operator synthesis.
+
+---
+
+## 4. GRAPH CONSTRUCTION
+
+graph_builder.py builds a minimal CDLGraph:
+
+Structure:
+
+For operator OP(a, b, ...):
+
+1. Create input nodes:
+   CDLNode(operator=None, value=TypedValue(...))
+
+2. Create operator node:
+   CDLNode(operator=OP, inputs=[input_nodes])
+
+3. Add nodes to CDLGraph
+4. Ensure topological order is valid
+
+Output:
+  CDLGraph with single operator node and resolved inputs
+
+Rules:
+- No execution
+- No MECP
+- No mutation of inputs
+- Deterministic node ordering
+
+---
+
+## 5. PLAN OUTPUT
+
+If cache hit:
+
+QueryPlan {
+  cache_hit = True
+  cached_result = TypedValue
+  graph = None
+}
+
+If cache miss:
+
+QueryPlan {
+  cache_hit = False
+  operator = CDLOperator
+  hydrated_slots = Dict[str, TypedValue]
+  graph = CDLGraph
+}
+
+All plans MUST include:
+- original IntentFrame
+- provenance (pattern id, domain, slots)
+- trace-ready metadata
+
+---
+
+## 6. FALLBACK HANDLING
+
+If IntentFrame.fallback == True:
+
+Planner MUST:
+- bypass operator resolution
+- forward to generic compiler path
+- emit QueryPlan with:
+    graph = None
+    operator = None
+    hydrated_slots = {}
+
+Compiler then handles generic graphs.
+
+---
+
+## 7. FAILURE HANDLING
+
+Planner MUST fail cleanly:
+
+- Raise PlanningError (captured into QueryPlan.errors)
+- MUST NOT crash process
+- MUST NOT partially build invalid graph
+
+Examples:
+
+Operator missing:
+  OPERATOR_NOT_FOUND
+
+Slot invalid:
+  SLOT_HYDRATION_FAILED
+
+Type mismatch:
+  TYPE_MISMATCH
+
+---
+
+## 8. TRACE REQUIREMENTS
+
+Planner MUST emit traceable metadata:
+
+PlanTrace {
+  intent
+  discourse_lookup
+  hydrated_slots
+  operator_key
+  type_validation
+  graph_nodes
+  errors
+}
+
+---
+
+# IMPLEMENTATION PRIORITY
+
+1. core/planner/plan.py
+2. core/planner/discourse_lookup.py
+3. core/planner/slot_hydrator.py
+4. core/planner/operator_resolver.py
+5. core/planner/graph_builder.py
+6. core/planner/__init__.py
+7. core/planner/tests.py
+
+---
+
+# VALIDATION EXAMPLES
+
+## Example 1 — Cache hit
+
+Input:
+  "capital of France"
+
+DiscourseState contains:
+  CAPITAL_OF(France) → Paris
+
+Expected:
+  cache_hit = True
+  cached_result = "Paris"
+  graph = None
+
+---
+
+## Example 2 — Cache miss, build plan
+
+Input:
+  "capital of Spain"
+
+DiscourseState:
+  no entry
+
+Expected:
+  cache_hit = False
+  operator = geography.CAPITAL_OF
+  hydrated_slots = { region: TypedValue("Spain") }
+  graph = CDLGraph(OP node)
+
+---
+
+## Example 3 — Physics hydration
+
+Input:
+  "calculate acceleration from force 10 N and mass 2 kg"
+
+Expected:
+  slots:
+    force = TypedValue({"value": 10, "unit": "N"})
+    mass = TypedValue({"value": 2, "unit": "kg"})
+  operator = physics.COMPUTE_ACCELERATION
+
+---
+
+## Example 4 — Type mismatch
+
+Input:
+  "calculate acceleration from force France and mass 2 kg"
+
+Expected:
+  PlanningError(TYPE_MISMATCH)
+
+---
+
+## Example 5 — Operator not found
+
+Input:
+  pattern matches unknown operator
+
+Expected:
+  PlanningError(OPERATOR_NOT_FOUND)
+
+---
+
+# DESIGN INTENT
+
+The planner is a deterministic bridge:
+
+IntentFrame
+→ (check memory)
+→ (prepare inputs)
+→ (resolve operator)
+→ (construct executable graph)
+
+It ensures:
+- no unnecessary execution
+- correct operator usage
+- typed inputs
+- minimal graph construction
+
+It is NOT:
+- an execution engine
+- a reasoning engine
+- a learning module
+
+---
+
+# END OF SPEC

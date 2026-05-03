@@ -1,0 +1,345 @@
+Below is the **implementation-grade System Specification (SSOT v1.0)** for your CDL + Discourse + MECP + DPK architecture. This is written as a **closed design contract** (not exploratory text). It is intentionally strict so Claude Code can implement without interpretation drift.
+
+---
+
+# SYSTEM SPECIFICATION v1.0
+
+## Lamina CDL–Discourse Execution Architecture (L-CDEA)
+
+---
+
+# 0. SYSTEM OVERVIEW
+
+The system is a **typed semantic execution engine** composed of:
+
+* A deterministic semantic compiler (CDL)
+* A discourse memory graph (DiscourseState)
+* A control-layer scheduler (MECP)
+* A discourse behavior policy kernel (DPK)
+* A canonicalization system (CAS)
+* A typed semantic ontology layer
+
+---
+
+# 1. CORE ARCHITECTURAL PRINCIPLE
+
+> Meaning is separated from control.
+> Execution is separated from interpretation.
+> Memory is separated from computation.
+
+No layer is allowed to violate its boundaries.
+
+---
+
+# 2. LAYERS
+
+## 2.1 SEMANTIC LAYER (IMMUTABLE TRUTH SYSTEM)
+
+### Components:
+
+* CDL (Core Definition Language)
+* Semantic Type System
+* Operator Definitions
+* Canonical Forms
+
+### Rules:
+
+* CDL operators are **immutable**
+* Types are **strictly enforced**
+* No adaptive behavior allowed in this layer
+
+---
+
+## 2.2 DISCOURSE LAYER (STATEFUL MEMORY SYSTEM)
+
+### Structure:
+
+```text
+DiscourseState:
+  nodes: Entity | Event | State | Process | Relation
+  edges: typed relations
+  salience: float weight
+  temporal_index: ordered history
+```
+
+### Rules:
+
+* Stores ONLY resolved outputs
+* No speculative branches stored permanently
+* Updated only after execution + MECP filtering
+
+---
+
+## 2.3 CONTROL LAYER (MECP SYSTEM)
+
+### Principle:
+
+> Minimum Effective Computation Principle (MECP)
+
+### Formal rule:
+
+```text
+Expand node N only if:
+  Expected_Information_Gain(N) > Computational_Cost(N)
+```
+
+### Responsibilities:
+
+* pruning interpretation branches
+* limiting graph expansion
+* stopping early resolution when sufficient certainty is reached
+
+### Hard constraint:
+
+* MUST NOT modify CDL semantics
+
+---
+
+## 2.4 DISCOURSE POLICY KERNEL (DPK)
+
+### Role:
+
+Controls **presentation and discourse behavior only**
+
+### Allowed actions:
+
+* adjust explanation style
+* influence traversal order of DiscourseState
+* prioritize conversational clarity
+* manage ambiguity expression
+
+### Forbidden:
+
+* altering meaning
+* changing operator semantics
+* modifying CDL outputs
+
+---
+
+## 2.5 CANONICALIZATION SYSTEM (CAS)
+
+### Purpose:
+
+Normalize semantic structures into unique form.
+
+### Rule:
+
+All equivalent structures MUST map to:
+
+> a single canonical CDL representation
+
+### Applied:
+
+* before comparison
+* before pruning
+* before memory merge
+
+### Not applied:
+
+* during partial interpretation branches
+
+---
+
+# 3. TYPE SYSTEM (STRICT)
+
+## 3.1 Allowed Types
+
+```text
+Entity
+Event
+State
+Process
+Relation
+Constraint
+Abstraction
+```
+
+## 3.2 Rule
+
+Every CDL operator MUST define:
+
+```text
+input_type → output_type
+```
+
+No untyped operations allowed.
+
+---
+
+# 4. CDL (CORE SEMANTIC LANGUAGE)
+
+## 4.1 Definition
+
+CDL is a **deterministic operator graph language**.
+
+Each operator:
+
+```text
+Operator:
+  name
+  input_types[]
+  output_type
+  transformation_rule
+```
+
+## 4.2 Rule
+
+* All meaning is compiled into CDL graphs
+* CDL graphs are the ONLY executable semantic form
+
+---
+
+# 5. MINIMUM EFFECTIVE COMPUTATION (MECP)
+
+## 5.1 Definition
+
+System expands only what is necessary for correctness.
+
+## 5.2 Formal rule:
+
+```text
+Expand only if:
+  P(correct) * InformationGain > Cost
+```
+
+## 5.3 Constraints:
+
+* limits polysemy exploration (top-k only)
+* limits graph expansion depth
+* enforces early termination when stable solution is found
+
+---
+
+# 6. DISCOURSE STATE RULES
+
+## 6.1 Update rule:
+
+DiscourseState(t+1) = f(
+DiscourseState(t),
+Canonical(CDL_Result),
+MECP_filtered_output
+)
+
+## 6.2 Storage rule:
+
+* only canonicalized outputs stored
+* low-salience nodes decay
+
+---
+
+# 7. CANONICALIZATION RULES
+
+## 7.1 MUST APPLY:
+
+* duplicate elimination
+* structural normalization
+* argument ordering standardization
+* triangle decomposition reduction
+
+## 7.2 MUST NOT APPLY:
+
+* during active interpretation branching
+* before ambiguity resolution is complete
+
+---
+
+# 8. DETERMINISM CONTRACT
+
+## Rule:
+
+Given identical:
+
+* input
+* DiscourseState snapshot
+* MECP configuration
+
+→ system MUST produce identical CDL output
+
+## Requirements:
+
+* all stochasticity must be seeded
+* no hidden runtime randomness allowed
+
+---
+
+# 9. PERSISTENCE MODEL
+
+## Persistent:
+
+* DiscourseState (filtered)
+* canonical CDL structures
+* validated semantic mappings
+
+## Transient:
+
+* interpretation branches
+* MECP evaluation trees
+* intermediate graphs
+
+---
+
+# 10. INTERACTION LOOP (OPTIONAL FEEDBACK)
+
+## Rule:
+
+Environment feedback:
+
+* MAY update DiscourseState ONLY
+* MUST NOT modify CDL or type system
+
+---
+
+# 11. FAILURE HANDLING
+
+## If ambiguity cannot be resolved:
+
+System MUST:
+
+1. Reduce to higher abstraction type
+2. Decompose into simpler CDL primitives
+3. Request missing context (if allowed)
+4. Select MECP-minimal interpretation fallback
+
+---
+
+# 12. PRIORITY HIERARCHY (GLOBAL)
+
+When conflicts occur:
+
+1. CDL type validity (absolute)
+2. Structural consistency
+3. MECP optimality
+4. Contextual coherence
+5. Expressiveness
+
+---
+
+# 13. SYSTEM BOUNDARY RULE
+
+The system is:
+
+> a CLOSED semantic execution engine with controlled external feedback
+
+External world:
+
+* influences DiscourseState only
+* never modifies semantics directly
+
+---
+
+# 14. FINAL SYSTEM DEFINITION
+
+The system is:
+
+> A deterministic, typed semantic compiler with a controlled memory graph, governed by a minimum-computation scheduler and a discourse-level policy kernel, capable of executing meaning as structured operator transformations.
+
+---
+
+# END OF SPECIFICATION v1.0
+
+---
+
+If you want next step, the natural progression is not design anymore—it is:
+
+> **turning this into a module-level Claude Code implementation plan (file structure, class definitions, and execution pipeline mapping)**
+

@@ -1,0 +1,17 @@
+{
+  "book_id": "11aa8cb1c956e71f",
+  "chapters_completed": 2,
+  "chapters_total": 2,
+  "chunks_processed": 2,
+  "chunks_total": 0,
+  "edges_added": 3,
+  "last_checkpoint": {
+    "book_id": "11aa8cb1c956e71f",
+    "chapter_id": "chap_adc710bc621c",
+    "chunk_index": 2,
+    "timestamp": 2
+  },
+  "nodes_added": 2,
+  "source_path": "/tmp/tmpqvh5eq8c/book.txt",
+  "status": "complete"
+}

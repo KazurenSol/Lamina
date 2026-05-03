@@ -1,0 +1,337 @@
+PROJECT: L-CDEA
+MODULE: domain/biology/
+
+PURPOSE:
+Provide a high-complexity domain pack for modeling biological processes, multi-step transformations, and hierarchical systems (cell → organ → organism).
+
+---
+
+# DOMAIN ROLE
+
+Biology Domain V1 is designed to stress:
+
+1. Multi-stage process reasoning
+2. Dependency chains across many steps
+3. Transformation of matter/energy
+4. System-level interactions (nested systems)
+5. DiscourseState accumulation from ingestion (textbooks)
+6. MECP pruning across long causal chains
+
+This domain is ideal for integration with ingestion/ (books).
+
+---
+
+# DIRECTORY STRUCTURE
+
+l_cdea/domain/biology/
+├── __init__.py
+├── operators.py
+├── types.py
+├── processes.py
+├── systems.py
+├── equivalence_rules.py
+├── compiler_bindings.py
+├── patterns.py
+├── examples.py
+└── tests.py
+
+---
+
+# BIOLOGY DOMAIN TYPES (mapped to core)
+
+Cell
+  maps_to: Entity
+
+Organism
+  maps_to: Entity
+
+Tissue
+  maps_to: Entity
+
+Organ
+  maps_to: Entity
+
+Molecule
+  maps_to: Entity
+
+Protein
+  maps_to: Entity
+
+DNA
+  maps_to: Entity
+
+RNA
+  maps_to: Entity
+
+Process (e.g., photosynthesis)
+  maps_to: Process
+
+Reaction
+  maps_to: Event
+
+Energy
+  maps_to: Entity
+
+Nutrient
+  maps_to: Entity
+
+Signal
+  maps_to: Event
+
+State (alive, active, inhibited)
+  maps_to: State
+
+Constraint (homeostasis, viability)
+  maps_to: Constraint
+
+---
+
+# BIOLOGY OPERATORS V1
+
+# Core biological processes
+
+PHOTOSYNTHESIS(inputs) -> Energy
+CELL_RESPIRATION(inputs) -> Energy
+PROTEIN_SYNTHESIS(DNA) -> Protein
+
+# Transformation
+
+CONVERT_SUBSTANCE(input, output) -> Process
+BREAK_DOWN(substance) -> Process
+BUILD_UP(substance) -> Process
+
+# Cellular operations
+
+DIVIDE_CELL(cell) -> Cell
+TRANSPORT(substance, from, to) -> State
+
+# Signaling
+
+SEND_SIGNAL(source, target, signal) -> Event
+RECEIVE_SIGNAL(target, signal) -> State
+
+# Regulation
+
+ACTIVATE(process) -> State
+INHIBIT(process) -> State
+
+# Measurement
+
+MEASURE_LEVEL(substance) -> Scalar
+
+---
+
+# REQUIRED CORE OPERATOR MAPPINGS
+
+PHOTOSYNTHESIS
+= TRANSFORM(light + CO2 + water → glucose + oxygen)
+
+CELL_RESPIRATION
+= TRANSFORM(glucose + oxygen → energy + CO2 + water)
+
+PROTEIN_SYNTHESIS
+= TRANSFORM(DNA → RNA → Protein)
+
+TRANSPORT
+= MOVE(substance)
+
+ACTIVATE
+= ENABLE(process)
+
+INHIBIT
+= DISABLE(process)
+
+---
+
+# PROCESS CHAIN RULES
+
+Biological processes MUST be represented as chains:
+
+Example:
+
+Photosynthesis:
+
+INPUT:
+  light + CO2 + water
+
+PROCESS:
+  PHOTOSYNTHESIS
+
+OUTPUT:
+  glucose + oxygen
+
+Chain representation:
+
+light → chemical energy → glucose
+
+---
+
+# CANONICALIZATION RULES
+
+CAS MUST recognize equivalent biological processes:
+
+Example:
+
+DNA → RNA → Protein
+is equivalent to:
+PROTEIN_SYNTHESIS(DNA)
+
+Energy transformations that yield same outputs MUST be equivalent.
+
+---
+
+# MECP STRESS CASES
+
+Example 1:
+Task:
+  "How do cells produce energy?"
+
+Possible graphs:
+  G1: direct CELL_RESPIRATION
+  G2: multi-step breakdown of glucose
+  G3: simulate full metabolic pathway
+
+Expected MECP preference:
+  G1
+
+---
+
+Example 2:
+Task:
+  "What happens without oxygen?"
+
+Possible graphs:
+  G1: inhibit respiration
+  G2: simulate full cascade failure
+  G3: alternate anaerobic pathway
+
+Expected MECP preference:
+  G1 or G3 depending on context
+
+---
+
+Example 3:
+Task:
+  "Explain photosynthesis"
+
+Possible graphs:
+  G1: high-level process
+  G2: detailed reaction chain
+  G3: full simulation
+
+Expected MECP preference:
+  G1
+
+---
+
+# EXECUTION RULES
+
+1. All biological operators MUST be deterministic
+2. No randomness in V1
+3. Time must be explicit in long processes
+4. No external biological databases in V1
+
+---
+
+# DISCOURSESTATE STORAGE RULES
+
+Biological knowledge should store:
+
+- processes
+- inputs/outputs
+- causal chains
+- system hierarchies
+
+Example:
+
+Process:
+  CELL_RESPIRATION
+
+Input:
+  glucose + oxygen
+
+Output:
+  energy + CO2 + water
+
+---
+
+# OPERATOR DISCOVERY RULES
+
+System MAY propose new operators:
+
+Example:
+
+GLYCOLYSIS
+=
+multi-step glucose breakdown
+
+Must meet validation rules before registration.
+
+---
+
+# INITIAL VALIDATION EXAMPLES
+
+Example 1:
+Input:
+  "What is photosynthesis?"
+
+Expected graph:
+  PHOTOSYNTHESIS(inputs)
+
+---
+
+Example 2:
+Input:
+  "How is protein made?"
+
+Expected graph:
+  PROTEIN_SYNTHESIS(DNA)
+
+---
+
+Example 3:
+Input:
+  "What happens when oxygen is removed?"
+
+Expected graph:
+  INHIBIT(CELL_RESPIRATION)
+
+---
+
+Example 4:
+Input:
+  "How do cells get energy?"
+
+Expected graph:
+  CELL_RESPIRATION
+
+---
+
+# HARD RULES
+
+1. Biology domain MUST NOT alter CDL semantics
+2. Biology domain MUST represent processes as chains
+3. Biology domain MUST remain deterministic
+4. Biology domain MUST not bypass CAS
+5. Biology domain MUST not bypass MECP
+6. Biology domain MUST not use probabilistic models in V1
+7. Biology domain MAY propose operators but MUST NOT auto-register
+8. Biology domain MUST maintain causal integrity
+
+---
+
+# IMPLEMENTATION PRIORITY
+
+1. domain/biology/types.py
+2. domain/biology/operators.py
+3. domain/biology/processes.py
+4. domain/biology/systems.py
+5. domain/biology/compiler_bindings.py
+6. domain/biology/equivalence_rules.py
+7. domain/biology/patterns.py
+8. domain/biology/examples.py
+9. domain/biology/tests.py
+
+---
+
+# END OF SPEC

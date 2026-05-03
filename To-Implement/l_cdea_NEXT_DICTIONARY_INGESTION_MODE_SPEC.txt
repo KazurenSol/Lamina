@@ -1,0 +1,254 @@
+PROJECT: L-CDEA
+MODULE: ingestion/modes/
+
+PURPOSE:
+Introduce a controlled ingestion mode specifically for dictionary-style and short-definition content, allowing ingestion of short, high-value entries without weakening standard document ingestion safeguards.
+
+Current issue:
+MIN_CHUNK_CHARS = 40 prevents ingestion of valid short definitions such as:
+  "Velocity is displacement over time."
+
+Desired behavior:
+Allow short, structured definition entries while maintaining strict filtering for general documents.
+
+---
+
+# POSITION IN PIPELINE
+
+Document Input
+→ Chunking (mode-aware)
+→ Ingestion Router
+→ Extractors
+→ Provenance
+→ Validation
+→ DiscourseState
+→ Persistence
+
+---
+
+# MODES
+
+Two ingestion modes:
+
+1. document (default)
+2. dictionary
+
+---
+
+# MODE DEFINITIONS
+
+## document mode
+
+Used for:
+- textbooks
+- articles
+- long-form content
+
+Rules:
+- MIN_CHUNK_CHARS = 40 (existing behavior)
+- aggressive filtering of short/noisy fragments
+- standard chunking logic
+
+---
+
+## dictionary mode
+
+Used for:
+- glossaries
+- definition lists
+- structured short knowledge entries
+
+Rules:
+- MIN_CHUNK_CHARS = 5
+- accept short declarative sentences
+- prioritize definition patterns
+- reject fragments that are not full statements
+
+---
+
+# API CHANGE
+
+Update:
+
+ingest_document(path, *, mode="document")
+
+Valid values:
+- "document"
+- "dictionary"
+
+Invalid mode:
+→ raise ValueError
+
+---
+
+# CHUNKER MODIFICATION
+
+In chunker or equivalent logic:
+
+if mode == "document":
+    min_chars = 40
+elif mode == "dictionary":
+    min_chars = 5
+
+Filtering rules:
+
+Dictionary mode MUST still reject:
+- single-word chunks
+- incomplete fragments (no verb)
+- punctuation-only strings
+
+---
+
+# ADDITIONAL DICTIONARY RULES
+
+Dictionary mode SHOULD:
+
+1. Prefer chunks matching definition patterns:
+   - "X is ..."
+   - "X refers to ..."
+   - "X is defined as ..."
+
+2. Penalize:
+   - lists without structure
+   - bullet fragments
+   - headings without definitions
+
+3. Allow one-sentence definitions
+
+---
+
+# ROUTER PRIORITY ADJUSTMENT
+
+In dictionary mode:
+
+Definition patterns SHOULD have increased weight:
+
+definition priority:
+  document mode → 100
+  dictionary mode → 200
+
+Ensures correct classification.
+
+---
+
+# VALIDATION ADJUSTMENT
+
+Validation scoring SHOULD be slightly adjusted:
+
+Dictionary mode:
+- increase confidence weight for:
+  source_type=document AND definition_extractor
+- allow shorter text with high confidence
+
+Threshold:
+- may remain 0.5, but ensure short valid definitions pass
+
+---
+
+# PROVENANCE REQUIREMENT
+
+Dictionary-ingested definitions MUST include:
+
+source_type = "document"
+extraction_method = "definition_extractor"
+mode = "dictionary"  (add to provenance or metadata)
+
+---
+
+# TRACE REQUIREMENTS
+
+Add to ingestion trace:
+
+IngestionModeTrace {
+  mode
+  min_chunk_chars
+  accepted_chunks
+  rejected_chunks
+}
+
+---
+
+# HARD RULES
+
+1. Mode MUST be explicitly set or default to "document".
+2. Dictionary mode MUST NOT weaken document mode behavior.
+3. Short chunks MUST only be accepted in dictionary mode.
+4. Validation MUST still apply.
+5. Provenance MUST record ingestion mode.
+6. Routing MUST remain deterministic.
+7. No ML or randomness introduced.
+8. Persistence MUST behave identically across modes.
+
+---
+
+# VALIDATION EXAMPLES
+
+Example 1 — document mode:
+
+Input:
+  "Velocity is displacement over time."
+
+Expected:
+  rejected (too short)
+
+---
+
+Example 2 — dictionary mode:
+
+Input:
+  "Velocity is displacement over time."
+
+Expected:
+  accepted as definition
+
+---
+
+Example 3 — invalid short fragment:
+
+Input:
+  "Velocity"
+
+Expected:
+  rejected even in dictionary mode
+
+---
+
+Example 4 — mixed content:
+
+Input:
+  paragraph with short and long lines
+
+Expected:
+  only valid definition lines accepted in dictionary mode
+
+---
+
+# IMPLEMENTATION PRIORITY
+
+1. modify chunker to accept mode
+2. update ingest_document() signature
+3. propagate mode to chunker and router
+4. adjust router pattern priority for dictionary mode
+5. adjust validation scoring (if needed)
+6. update provenance to include mode
+7. add tests:
+   - document mode rejects short definition
+   - dictionary mode accepts it
+   - invalid fragments still rejected
+8. update trace output
+
+---
+
+# DESIGN INTENT
+
+Different ingestion types require different thresholds.
+
+This module allows:
+- strict filtering for documents
+- precise ingestion for structured knowledge
+
+without compromising system integrity.
+
+---
+
+# END OF SPEC

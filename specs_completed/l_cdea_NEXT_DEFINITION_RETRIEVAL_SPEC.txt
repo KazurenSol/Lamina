@@ -1,0 +1,349 @@
+PROJECT: L-CDEA
+MODULE: discourse/definition_retrieval/
+
+PURPOSE:
+Enable L-CDEA to answer definition-style queries using knowledge already stored in DiscourseState.
+
+Current issue:
+  Ingestion stores definitions successfully, but user queries like:
+    "what is acceleration"
+    "define force"
+    "what is velocity"
+  either fall back to generic compilation or incorrectly route to unrelated physics operators.
+
+Desired behavior:
+  "what is acceleration"
+  → discourse.GET_DEFINITION(term="acceleration")
+  → return stored definition from DiscourseState with provenance.
+
+---
+
+# POSITION IN PIPELINE
+
+Input
+→ Parser
+→ Router
+→ Planner
+→ Definition Retrieval
+→ Execution / Cache
+→ DiscourseState
+→ Trace
+
+Definition retrieval is a knowledge-access path.
+It MUST NOT modify CDL semantics.
+
+---
+
+# DIRECTORY STRUCTURE
+
+l_cdea/discourse/definition_retrieval/
+├── __init__.py
+├── operator.py
+├── lookup.py
+├── patterns.py
+├── normalization.py
+├── trace.py
+└── tests.py
+
+---
+
+# CORE OPERATOR
+
+GET_DEFINITION(term) -> Entity
+
+Input:
+  term: Entity
+
+Output:
+  definition text or ProvenancedValue
+
+Example:
+  GET_DEFINITION("acceleration")
+  → "Acceleration is the rate of change of velocity."
+
+---
+
+# ROUTER PATTERNS
+
+Add definition-query patterns to the router.
+
+Patterns:
+
+1. "what is X"
+2. "what is a X"
+3. "what is an X"
+4. "define X"
+5. "definition of X"
+6. "what does X mean"
+
+These MUST map to:
+
+IntentFrame {
+  domain: "discourse"
+  operator_name: "GET_DEFINITION"
+  slots: { "term": X }
+  confidence: deterministic_score
+  fallback: false
+}
+
+---
+
+# FALSE POSITIVE PREVENTION
+
+Definition patterns MUST take priority over domain action patterns when the query form is definitional.
+
+Example:
+
+Input:
+  "what is velocity"
+
+MUST route to:
+  discourse.GET_DEFINITION(term="velocity")
+
+MUST NOT route to:
+  physics.UPDATE_VELOCITY
+
+Rule:
+  If input matches definition-query structure, suppress action/operator patterns unless explicit action words are present.
+
+Explicit action examples:
+  "update velocity"
+  "calculate velocity"
+  "compute velocity"
+
+---
+
+# INGESTION TAGGING REQUIREMENT
+
+Definitions stored from ingestion MUST be tagged.
+
+Each definition node SHOULD include metadata:
+
+metadata {
+  category: "definition"
+  term: normalized_term
+  definition_text: original_definition_text
+}
+
+If metadata support is not available on DiscourseNode, add it.
+
+Rules:
+1. definition nodes MUST store the defined term
+2. definition nodes MUST store definition text
+3. provenance MUST be preserved
+4. duplicate definitions merge provenance, not overwrite
+
+---
+
+# NORMALIZATION RULES
+
+normalization.py:
+
+normalize_term(term):
+
+Rules:
+1. lowercase
+2. strip punctuation
+3. trim whitespace
+4. singular/plural normalization optional in V1
+5. no fuzzy matching in V1
+
+Examples:
+  "Acceleration" → "acceleration"
+  "velocity?" → "velocity"
+
+---
+
+# LOOKUP RULES
+
+lookup.py:
+
+lookup_definition(term, discourse_state)
+
+Search order:
+
+1. Exact normalized term match in definition metadata
+2. Exact node value match if node represents term
+3. Provenance-backed definition relation
+4. No match → LookupMiss
+
+Ranking if multiple definitions:
+
+1. highest provenance confidence
+2. highest salience
+3. newest temporal_index
+4. deterministic node id tie-break
+
+---
+
+# OPERATOR BEHAVIOR
+
+operator.py:
+
+GET_DEFINITION executes by:
+
+1. receiving term TypedValue
+2. normalizing term
+3. searching DiscourseState definition nodes
+4. returning stored definition text
+5. preserving provenance in result if supported
+
+If no definition exists:
+
+Return symbolic fallback:
+
+definition_of(term)
+
+Do NOT crash.
+
+---
+
+# PLANNER INTEGRATION
+
+Planner MUST support discourse operator:
+
+domain = "discourse"
+operator = "GET_DEFINITION"
+
+For this operator:
+1. hydrate term as TypedValue(term, Entity)
+2. resolve operator through governance
+3. build minimal graph if not cache hit
+
+Optional optimization:
+Planner may check discourse definition lookup before graph build.
+
+---
+
+# GOVERNANCE INTEGRATION
+
+Register governed operator:
+
+discourse.GET_DEFINITION@1.0
+
+Rules:
+1. status = active
+2. deterministic = true
+3. side_effect_free = true
+4. TypeSignature: [Entity] → Entity
+
+---
+
+# TRACE REQUIREMENTS
+
+DefinitionRetrievalTrace {
+  term
+  normalized_term
+  matched_node_id
+  hit
+  returned_value
+  provenance_count
+  fallback_used
+}
+
+Trace must show:
+- whether retrieval hit or missed
+- which definition node was used
+- why a definition was selected if multiple exist
+
+---
+
+# HARD RULES
+
+1. Definition retrieval MUST be deterministic.
+2. It MUST NOT modify CDL semantics.
+3. It MUST NOT overwrite DiscourseState.
+4. It MUST preserve provenance.
+5. It MUST avoid false routing to action operators.
+6. Missing definitions MUST fall back cleanly.
+7. Definition queries MUST not produce generic token graphs.
+8. Definitions MUST be trace-visible.
+9. GET_DEFINITION MUST be governed and active.
+10. Retrieval MUST not use external services in V1.
+
+---
+
+# VALIDATION EXAMPLES
+
+Example 1 — acceleration:
+
+Prior ingested text:
+  "Acceleration is the rate of change of velocity."
+
+Input:
+  "what is acceleration"
+
+Expected:
+  route = discourse.GET_DEFINITION
+  term = acceleration
+  output = "Acceleration is the rate of change of velocity."
+
+---
+
+Example 2 — force:
+
+Prior ingested text:
+  "Force is defined as mass times acceleration."
+
+Input:
+  "define force"
+
+Expected:
+  output = "Force is defined as mass times acceleration."
+
+---
+
+Example 3 — velocity false-positive prevention:
+
+Input:
+  "what is velocity"
+
+Expected:
+  route = discourse.GET_DEFINITION
+  NOT physics.UPDATE_VELOCITY
+
+---
+
+Example 4 — missing term:
+
+Input:
+  "what is luminiferous ether"
+
+Expected:
+  no crash
+  output = definition_of(luminiferous ether)
+  fallback_used = true
+
+---
+
+Example 5 — duplicate definition:
+
+Existing:
+  acceleration definition from document A
+
+New:
+  same acceleration definition from document B
+
+Expected:
+  one definition node
+  merged provenance
+
+---
+
+# IMPLEMENTATION PRIORITY
+
+1. discourse/definition_retrieval/normalization.py
+2. discourse/definition_retrieval/lookup.py
+3. discourse/definition_retrieval/operator.py
+4. discourse/definition_retrieval/patterns.py
+5. discourse/definition_retrieval/trace.py
+6. discourse/definition_retrieval/__init__.py
+7. patch router pattern registration
+8. patch ingestion definition tagging
+9. register discourse.GET_DEFINITION@1.0 in governance
+10. add tests.py
+11. run CLI validation examples
+
+---
+
+# END OF SPEC

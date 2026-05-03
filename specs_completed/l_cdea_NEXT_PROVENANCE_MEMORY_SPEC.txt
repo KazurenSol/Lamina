@@ -1,0 +1,317 @@
+PROJECT: L-CDEA
+MODULE: discourse/provenance/
+
+PURPOSE:
+Ensure all ingested or derived knowledge stored in DiscourseState includes full provenance metadata.
+
+Prevents:
+- anonymous “truth”
+- silent overwrites
+- unverifiable knowledge
+- source ambiguity
+
+Every node/edge introduced through ingestion or transformation MUST carry provenance.
+
+---
+
+# POSITION IN PIPELINE
+
+Document Input
+→ Chunking
+→ Ingestion Router
+→ Extractors
+→ Provenance Attachment (THIS MODULE)
+→ Validation
+→ DiscourseState
+→ Persistence
+
+---
+
+# DIRECTORY STRUCTURE
+
+l_cdea/discourse/provenance/
+├── __init__.py
+├── model.py
+├── attach.py
+├── merge.py
+├── validation.py
+└── tests.py
+
+---
+
+# CORE TYPES
+
+Provenance {
+  source_id: str
+  source_type: str  # "document" | "dataset" | "execution"
+  source_path: Optional[str]
+  chunk_id: Optional[str]
+  location: Optional[str]  # page/paragraph/section
+  extraction_method: str   # "definition_extractor", "claim_extractor", etc.
+  confidence: float
+  trace_id: str
+  timestamp_index: int
+}
+
+ProvenancedValue {
+  value: Any
+  semantic_type: str
+  provenance: Provenance
+}
+
+ProvenanceMergeResult {
+  merged_provenance: Tuple[Provenance, ...]
+  conflict: bool
+}
+
+---
+
+# ATTACHMENT RULES
+
+attach.py:
+
+attach_provenance(value, provenance) -> ProvenancedValue
+
+Rules:
+1. All extracted values MUST be wrapped as ProvenancedValue.
+2. Execution-derived values MUST include execution provenance.
+3. Dataset lookups MUST include dataset provenance.
+4. Parser/router MUST NOT assign provenance (only ingestion/execution layers).
+
+---
+
+# REQUIRED FIELDS
+
+Every Provenance MUST include:
+
+source_id
+source_type
+extraction_method
+confidence
+trace_id
+timestamp_index
+
+Optional but recommended:
+
+source_path
+chunk_id
+location
+
+---
+
+# CONFIDENCE RULES
+
+confidence ∈ [0.0, 1.0]
+
+Definition:
+- extraction-based: moderate (0.6–0.9)
+- dataset-based: high (≈1.0)
+- execution-derived: depends on inputs
+- inferred/transformed: lower unless validated
+
+Confidence MUST NOT be random.
+
+---
+
+# MERGE RULES
+
+merge.py:
+
+merge_provenance(existing, new) -> ProvenanceMergeResult
+
+Rules:
+1. If values are identical:
+   - merge provenance lists
+2. If values differ:
+   - mark conflict = True
+   - do not overwrite existing value
+3. Provenance list MUST be deduplicated
+4. Order MUST be deterministic (sorted by timestamp_index)
+
+---
+
+# VALIDATION RULES
+
+validation.py:
+
+validate_provenance(prov)
+
+Checks:
+1. required fields present
+2. confidence within bounds
+3. trace_id exists
+4. timestamp_index monotonic
+
+Failure → ProvenanceValidationError
+
+---
+
+# DISCOURSESTATE INTEGRATION
+
+DiscourseNode MUST be extended:
+
+DiscourseNode {
+  id
+  semantic_type
+  value
+  provenance: Tuple[Provenance, ...]
+  salience
+  created_at
+  updated_at
+}
+
+Rules:
+1. All nodes MUST carry provenance
+2. New nodes MUST have at least one provenance entry
+3. Updates MUST merge provenance, not replace
+4. Cache writes MUST propagate provenance
+
+---
+
+# DATASET INTEGRATION
+
+Data-backed operators MUST attach provenance:
+
+Example:
+
+CAPITAL_OF(France) → Paris
+
+Provenance:
+  source_id = "country_capitals_v1"
+  source_type = "dataset"
+  extraction_method = "dataset_lookup"
+  confidence = 1.0
+
+---
+
+# EXECUTION INTEGRATION
+
+Execution-derived outputs MUST include:
+
+source_type = "execution"
+extraction_method = operator_name
+trace_id = execution trace id
+
+---
+
+# TRACE REQUIREMENTS
+
+Trace MUST include provenance:
+
+ProvenanceTrace {
+  value
+  provenance_entries
+  merge_events
+  conflicts
+}
+
+---
+
+# HARD RULES
+
+1. No value may enter DiscourseState without provenance.
+2. Provenance MUST be deterministic.
+3. Provenance MUST NOT be lost during merges.
+4. Provenance MUST NOT be overwritten silently.
+5. Conflicting values MUST NOT overwrite existing nodes.
+6. Provenance MUST survive persistence and reload.
+7. Provenance MUST NOT alter CDL semantics.
+8. Provenance MUST NOT be assigned by parser/router.
+
+---
+
+# VALIDATION EXAMPLES
+
+Example 1 — definition ingestion:
+
+Input:
+  "Acceleration is defined as rate of change of velocity."
+
+Expected:
+  value stored with provenance:
+    source_type = document
+    extraction_method = definition_extractor
+
+---
+
+Example 2 — dataset lookup:
+
+Input:
+  "capital of France"
+
+Expected:
+  value = Paris
+  provenance:
+    source_id = country_capitals_v1
+    source_type = dataset
+
+---
+
+Example 3 — execution result:
+
+Input:
+  "calculate acceleration from force 10 N and mass 2 kg"
+
+Expected:
+  value = 5 m/s²
+  provenance:
+    source_type = execution
+    extraction_method = COMPUTE_ACCELERATION
+
+---
+
+Example 4 — merge:
+
+Existing:
+  Paris (dataset)
+
+New:
+  Paris (document)
+
+Expected:
+  merged provenance (2 entries)
+
+---
+
+Example 5 — conflict:
+
+Existing:
+  Paris
+
+New:
+  Lyon
+
+Expected:
+  conflict flagged
+  original value preserved
+
+---
+
+# IMPLEMENTATION PRIORITY
+
+1. discourse/provenance/model.py
+2. discourse/provenance/attach.py
+3. discourse/provenance/validation.py
+4. discourse/provenance/merge.py
+5. patch DiscourseNode
+6. patch execution/data-backed operators
+7. patch persistence layer
+8. discourse/provenance/tests.py
+
+---
+
+# DESIGN INTENT
+
+Knowledge must be traceable.
+
+Every value must answer:
+- where did this come from?
+- how was it extracted?
+- how confident is it?
+- when was it added?
+
+This module enforces that discipline.
+
+---
+
+# END OF SPEC

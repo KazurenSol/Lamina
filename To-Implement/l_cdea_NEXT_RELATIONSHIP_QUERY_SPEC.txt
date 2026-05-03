@@ -1,0 +1,318 @@
+PROJECT: L-CDEA
+MODULE: discourse/relationship_query/
+
+PURPOSE:
+Enable querying stored relationship edges in DiscourseState.
+
+Current behavior:
+Relationship extraction creates edges such as:
+  force --depends_on--> mass
+  force --depends_on--> acceleration
+
+But queries like:
+  "what does force depend on"
+
+fall back to generic compilation and produce useless generic graph output.
+
+Desired behavior:
+  "what does force depend on"
+  → discourse.GET_RELATIONSHIPS(term="force", relation_type="depends_on")
+  → return ["mass", "acceleration"]
+
+---
+
+# POSITION IN PIPELINE
+
+Input
+→ Parser
+→ Router
+→ Planner
+→ Relationship Query
+→ Output / Trace
+
+---
+
+# DIRECTORY STRUCTURE
+
+l_cdea/discourse/relationship_query/
+├── __init__.py
+├── operator.py
+├── lookup.py
+├── patterns.py
+├── normalization.py
+├── trace.py
+└── tests.py
+
+---
+
+# CORE OPERATOR
+
+GET_RELATIONSHIPS(term, relation_type) -> Entity
+
+Input:
+  term: Entity
+  relation_type: Entity
+
+Output:
+  list of related terms or symbolic fallback
+
+Example:
+  GET_RELATIONSHIPS("force", "depends_on")
+  → ["mass", "acceleration"]
+
+---
+
+# ROUTER PATTERNS
+
+Add relationship-query patterns to router.
+
+Patterns:
+
+1. "what does X depend on"
+   → relation_type = "depends_on"
+
+2. "what is X related to"
+   → relation_type = "related_to"
+
+3. "what causes X"
+   → inverse lookup for relation_type = "causes"
+
+4. "what is part of X"
+   → inverse lookup for relation_type = "part_of"
+
+5. "what is X part of"
+   → forward lookup for relation_type = "part_of"
+
+Primary V1 requirement:
+  support "what does X depend on"
+
+IntentFrame:
+
+domain = "discourse"
+operator_name = "GET_RELATIONSHIPS"
+slots = {
+  "term": X,
+  "relation_type": "depends_on"
+}
+arg_order = ("term", "relation_type")
+
+---
+
+# FALSE POSITIVE PREVENTION
+
+Relationship query patterns MUST beat generic fallback.
+
+Priority:
+  relationship-query patterns = 190
+  definition-query patterns = 200
+
+Definition queries still win for:
+  "what is X"
+
+Relationship queries win for:
+  "what does X depend on"
+
+---
+
+# LOOKUP RULES
+
+lookup.py:
+
+lookup_relationships(term, relation_type, discourse_state)
+
+Steps:
+1. normalize term
+2. find source node matching term
+3. find outgoing edges with matching relation_type
+4. return target node values
+5. sort results deterministically
+
+Ranking:
+1. edge salience descending
+2. provenance confidence descending
+3. target value lexicographic
+
+---
+
+# NORMALIZATION RULES
+
+normalize_term(term):
+1. lowercase
+2. strip punctuation
+3. trim whitespace
+4. collapse whitespace
+
+Relation names are normalized to snake_case.
+
+Examples:
+  "depend on" → "depends_on"
+  "depends on" → "depends_on"
+
+---
+
+# OPERATOR BEHAVIOR
+
+GET_RELATIONSHIPS executes by:
+1. receiving term and relation_type TypedValues
+2. looking up matching DiscourseState edges
+3. returning a deterministic list of related terms
+
+If no match:
+  return relationships_of(term, relation_type)
+
+Do not crash.
+
+---
+
+# PLANNER INTEGRATION
+
+Planner MUST support:
+
+domain = "discourse"
+operator = "GET_RELATIONSHIPS"
+
+For this operator:
+1. hydrate term as TypedValue(term, Entity)
+2. hydrate relation_type as TypedValue(relation_type, Entity)
+3. short-circuit to relationship lookup before graph build when possible
+4. cache actual hits only
+5. fallback is NOT cache_hit
+
+---
+
+# GOVERNANCE INTEGRATION
+
+Register:
+
+discourse.GET_RELATIONSHIPS@1.0
+
+TypeSignature:
+  [Entity, Entity] → Entity
+
+metadata:
+  deterministic = true
+  side_effect_free = true
+
+---
+
+# TRACE REQUIREMENTS
+
+RelationshipQueryTrace {
+  term
+  normalized_term
+  relation_type
+  matched_source_node_id
+  matched_edges
+  returned_values
+  hit
+  fallback_used
+  provenance_count
+}
+
+Trace should show:
+- which source node matched
+- which edge IDs/targets matched
+- returned related terms
+
+---
+
+# OUTPUT FORMAT
+
+For:
+
+  what does force depend on
+
+Preferred CLI output:
+
+[Entity] force depends_on:
+  - acceleration
+  - mass
+
+If no match:
+
+[Entity] relationships_of(force, depends_on)
+  [no provenance]
+
+---
+
+# HARD RULES
+
+1. Relationship query MUST be deterministic.
+2. It MUST NOT modify CDL semantics.
+3. It MUST NOT modify DiscourseState.
+4. It MUST preserve provenance in trace/display.
+5. It MUST avoid generic fallback for supported relationship-query patterns.
+6. Missing relationships MUST fall back cleanly.
+7. GET_RELATIONSHIPS MUST be governed and active.
+8. It MUST not use external services in V1.
+
+---
+
+# VALIDATION EXAMPLES
+
+Example 1:
+
+Prior ingested:
+  "Force is mass times acceleration."
+
+Input:
+  "what does force depend on"
+
+Expected:
+  route = discourse.GET_RELATIONSHIPS
+  output includes:
+    mass
+    acceleration
+
+---
+
+Example 2:
+
+Prior ingested:
+  "Acceleration is the rate of change of velocity."
+
+Input:
+  "what does acceleration depend on"
+
+Expected:
+  output includes:
+    velocity
+
+---
+
+Example 3:
+
+Input:
+  "what does entropy depend on"
+
+Expected:
+  fallback:
+    relationships_of(entropy, depends_on)
+
+---
+
+Example 4:
+
+Ensure:
+  "what is force"
+still routes to GET_DEFINITION, not GET_RELATIONSHIPS.
+
+---
+
+# IMPLEMENTATION PRIORITY
+
+1. discourse/relationship_query/normalization.py
+2. discourse/relationship_query/lookup.py
+3. discourse/relationship_query/operator.py
+4. discourse/relationship_query/patterns.py
+5. discourse/relationship_query/trace.py
+6. discourse/relationship_query/__init__.py
+7. patch router pattern registration
+8. patch planner short-circuit path
+9. register discourse.GET_RELATIONSHIPS@1.0
+10. add tests.py
+11. CLI validation
+
+---
+
+# END OF SPEC

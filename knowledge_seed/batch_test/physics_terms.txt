@@ -1,0 +1,3 @@
+Velocity is displacement over time.
+Force is mass times acceleration.
+Acceleration is the rate of change of velocity.

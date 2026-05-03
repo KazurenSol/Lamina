@@ -1,0 +1,230 @@
+{
+  "created_by": "l_cdea",
+  "edges": [
+    {
+      "provenance": [
+        {
+          "chunk_id": "chunk_8928e571",
+          "confidence": 0.75,
+          "extraction_method": "relationship_extractor",
+          "location": "section:sec_7ecdc603:para:1",
+          "source_id": "physics_book_v1.txt",
+          "source_path": "/home/nestor/Desktop/Lamina/knowledge_seed/physics_book_v1.txt",
+          "source_type": "document",
+          "timestamp_index": 1,
+          "trace_id": "tr_b8607bbfbbcc"
+        }
+      ],
+      "relation_type": "depends_on",
+      "salience": 0.75,
+      "source_id": "dn_b4b6d07e43ed3a14",
+      "target_id": "dn_eb55fb797e34c000"
+    },
+    {
+      "provenance": [
+        {
+          "chunk_id": "chunk_e02c62c3",
+          "confidence": 0.75,
+          "extraction_method": "relationship_extractor",
+          "location": "section:sec_7ecdc603:para:3",
+          "source_id": "physics_book_v1.txt",
+          "source_path": "/home/nestor/Desktop/Lamina/knowledge_seed/physics_book_v1.txt",
+          "source_type": "document",
+          "timestamp_index": 3,
+          "trace_id": "tr_37a612efc80c"
+        }
+      ],
+      "relation_type": "is_a",
+      "salience": 0.75,
+      "source_id": "dn_cc8816f354cde030",
+      "target_id": "dn_1ee062559be03a85"
+    }
+  ],
+  "metadata": {
+    "planner_cache": {},
+    "salience_index": {
+      "dn_1ee062559be03a85": 0.5,
+      "dn_245809cce80d41c0": 1.0,
+      "dn_a25ad731188519aa": 1.0,
+      "dn_b4b6d07e43ed3a14": 0.5,
+      "dn_cc8816f354cde030": 0.5,
+      "dn_eb55fb797e34c000": 0.5
+    },
+    "temporal_index": 0
+  },
+  "nodes": [
+    {
+      "canonical_signature": null,
+      "created_at": 0,
+      "id": "dn_1ee062559be03a85",
+      "metadata": {
+        "category": "relationship_term",
+        "term": "amount of matter in an object"
+      },
+      "provenance": [
+        {
+          "chunk_id": "chunk_e02c62c3",
+          "confidence": 0.75,
+          "extraction_method": "relationship_extractor",
+          "location": "section:sec_7ecdc603:para:3",
+          "source_id": "physics_book_v1.txt",
+          "source_path": "/home/nestor/Desktop/Lamina/knowledge_seed/physics_book_v1.txt",
+          "source_type": "document",
+          "timestamp_index": 3,
+          "trace_id": "tr_37a612efc80c"
+        }
+      ],
+      "salience": 0.5,
+      "semantic_type": "Entity",
+      "updated_at": 0,
+      "value": "amount of matter in an object"
+    },
+    {
+      "canonical_signature": null,
+      "created_at": 3,
+      "id": "dn_245809cce80d41c0",
+      "metadata": {
+        "book_id": "52a27ecc9a654d6f",
+        "category": "definition",
+        "chapter_id": "chap_60fc27702f11",
+        "chunk_id": "chunk_e02c62c3",
+        "definition_text": "Mass is the amount of matter in an object.",
+        "ingestion_mode": "book",
+        "paragraph_index": 3,
+        "section_id": "sec_7ecdc603",
+        "term": "mass"
+      },
+      "provenance": [
+        {
+          "chunk_id": "chunk_e02c62c3",
+          "confidence": 0.8,
+          "extraction_method": "pattern_v1",
+          "location": "section:sec_7ecdc603:para:3",
+          "source_id": "physics_book_v1.txt",
+          "source_path": "/home/nestor/Desktop/Lamina/knowledge_seed/physics_book_v1.txt",
+          "source_type": "document",
+          "timestamp_index": 3,
+          "trace_id": "tr_9b44f5149581"
+        }
+      ],
+      "salience": 1.0,
+      "semantic_type": "Entity",
+      "updated_at": 3,
+      "value": "Mass is the amount of matter in an object."
+    },
+    {
+      "canonical_signature": null,
+      "created_at": 1,
+      "id": "dn_a25ad731188519aa",
+      "metadata": {
+        "book_id": "52a27ecc9a654d6f",
+        "category": "definition",
+        "chapter_id": "chap_60fc27702f11",
+        "chunk_id": "chunk_8928e571",
+        "definition_text": "Acceleration is the rate of change of velocity.",
+        "ingestion_mode": "book",
+        "paragraph_index": 1,
+        "section_id": "sec_7ecdc603",
+        "term": "acceleration"
+      },
+      "provenance": [
+        {
+          "chunk_id": "chunk_8928e571",
+          "confidence": 0.8,
+          "extraction_method": "pattern_v1",
+          "location": "section:sec_7ecdc603:para:1",
+          "source_id": "physics_book_v1.txt",
+          "source_path": "/home/nestor/Desktop/Lamina/knowledge_seed/physics_book_v1.txt",
+          "source_type": "document",
+          "timestamp_index": 1,
+          "trace_id": "tr_1cee850860a8"
+        }
+      ],
+      "salience": 1.0,
+      "semantic_type": "Entity",
+      "updated_at": 1,
+      "value": "Acceleration is the rate of change of velocity."
+    },
+    {
+      "canonical_signature": null,
+      "created_at": 0,
+      "id": "dn_b4b6d07e43ed3a14",
+      "metadata": {
+        "category": "relationship_term",
+        "term": "acceleration"
+      },
+      "provenance": [
+        {
+          "chunk_id": "chunk_8928e571",
+          "confidence": 0.75,
+          "extraction_method": "relationship_extractor",
+          "location": "section:sec_7ecdc603:para:1",
+          "source_id": "physics_book_v1.txt",
+          "source_path": "/home/nestor/Desktop/Lamina/knowledge_seed/physics_book_v1.txt",
+          "source_type": "document",
+          "timestamp_index": 1,
+          "trace_id": "tr_b8607bbfbbcc"
+        }
+      ],
+      "salience": 0.5,
+      "semantic_type": "Entity",
+      "updated_at": 0,
+      "value": "acceleration"
+    },
+    {
+      "canonical_signature": null,
+      "created_at": 0,
+      "id": "dn_cc8816f354cde030",
+      "metadata": {
+        "category": "relationship_term",
+        "term": "mass"
+      },
+      "provenance": [
+        {
+          "chunk_id": "chunk_e02c62c3",
+          "confidence": 0.75,
+          "extraction_method": "relationship_extractor",
+          "location": "section:sec_7ecdc603:para:3",
+          "source_id": "physics_book_v1.txt",
+          "source_path": "/home/nestor/Desktop/Lamina/knowledge_seed/physics_book_v1.txt",
+          "source_type": "document",
+          "timestamp_index": 3,
+          "trace_id": "tr_37a612efc80c"
+        }
+      ],
+      "salience": 0.5,
+      "semantic_type": "Entity",
+      "updated_at": 0,
+      "value": "mass"
+    },
+    {
+      "canonical_signature": null,
+      "created_at": 0,
+      "id": "dn_eb55fb797e34c000",
+      "metadata": {
+        "category": "relationship_term",
+        "term": "velocity"
+      },
+      "provenance": [
+        {
+          "chunk_id": "chunk_8928e571",
+          "confidence": 0.75,
+          "extraction_method": "relationship_extractor",
+          "location": "section:sec_7ecdc603:para:1",
+          "source_id": "physics_book_v1.txt",
+          "source_path": "/home/nestor/Desktop/Lamina/knowledge_seed/physics_book_v1.txt",
+          "source_type": "document",
+          "timestamp_index": 1,
+          "trace_id": "tr_b8607bbfbbcc"
+        }
+      ],
+      "salience": 0.5,
+      "semantic_type": "Entity",
+      "updated_at": 0,
+      "value": "velocity"
+    }
+  ],
+  "schema_version": "1.2",
+  "snapshot_id": "snap_b9f614a6f9377bd8",
+  "temporal_index": []
+}

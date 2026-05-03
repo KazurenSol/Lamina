@@ -1,0 +1,261 @@
+PROJECT: L-CDEA (Lamina CDL–Discourse Execution Architecture)
+MODULE: control/mecp/
+
+STATUS:
+normalization/canonicalizer/ COMPLETE + VERIFIED
+Input: CanonicalGraphSet (equivalence-class grouped, structurally normalized)
+Output: ExecutionSubset (pruned + scheduled CDLGraphs)
+
+---
+
+# PURPOSE OF THIS MODULE
+
+MECP is the **global decision scheduler**.
+
+It selects:
+- which canonical graphs are executed
+- in what order
+- and to what depth expansion occurs
+
+It is the FIRST layer that:
+- reduces possibility space
+- introduces cost-based selection
+- commits computation resources
+
+---
+
+# POSITION IN PIPELINE
+
+Input →
+Parser →
+Compiler →
+CAS →
+MECP →
+Executor →
+DiscourseState →
+Trace
+
+---
+
+# HARD INVARIANTS
+
+1. MECP MUST be deterministic
+2. MECP MUST NOT modify CDL structures
+3. MECP MUST NOT mutate canonical graphs
+4. MECP MUST operate ONLY on canonicalized input
+5. MECP MUST produce at least one execution path unless system is invalid
+6. MECP MUST NOT access DiscourseState
+7. MECP MUST NOT execute operators (selection only)
+
+---
+
+# DIRECTORY STRUCTURE
+
+l_cdea/control/mecp/
+│
+├── __init__.py
+├── scoring.py
+├── scheduler.py
+├── pruning.py
+├── cost_model.py
+└── exceptions.py
+
+---
+
+# 1. cost_model.py — COMPUTATIONAL COST FUNCTION
+
+PURPOSE:
+Assign cost values to graph operations.
+
+CORE MODEL:
+
+Cost(node) =
+
+  α * structural_depth
++ β * operator_complexity
++ γ * branching_factor
++ δ * type_conversion_cost
+
+RULES:
+- constants α, β, γ, δ are system configuration parameters
+- must be deterministic
+- must not depend on runtime randomness
+
+OUTPUT:
+CostMap[CDLGraph]
+
+---
+
+# 2. scoring.py — INFORMATION GAIN ESTIMATOR
+
+PURPOSE:
+Estimate utility of executing a graph.
+
+CORE MODEL:
+
+InformationGain(graph) =
+
+  resolved_type_certainty
++ structural_compression_gain
++ dependency_resolution_value
+
+RULES:
+- no probabilistic language model access
+- no external memory influence
+- based ONLY on graph structure
+
+OUTPUT:
+GainMap[CDLGraph]
+
+---
+
+# 3. scheduler.py — PRIORITY QUEUE ENGINE
+
+PURPOSE:
+Rank canonical graphs for execution order.
+
+CORE RULE:
+
+Priority(graph) = InformationGain(graph) / Cost(graph)
+
+RULES:
+- deterministic sorting only
+- stable tie-breaking via canonical signature hash
+- no external state influence
+
+OUTPUT:
+ExecutionQueue (ordered list of graphs)
+
+---
+
+# 4. pruning.py — EXECUTION SUBSET SELECTOR
+
+PURPOSE:
+Select subset of graphs for execution.
+
+RULES:
+
+A graph is included IF:
+
+Priority(graph) ≥ threshold τ
+
+AND
+
+graph is reachable under canonical dependency constraints
+
+RULES:
+- no semantic pruning
+- no interpretation-based elimination
+- only cost/benefit filtering
+
+OUTPUT:
+ExecutionSubset
+
+---
+
+# 5. exceptions.py
+
+DEFINE:
+
+class MECPError(Exception):
+    pass
+
+class CostModelError(MECPError):
+    pass
+
+class SchedulingError(MECPError):
+    pass
+
+class PruningError(MECPError):
+    pass
+
+---
+
+# OUTPUT CONTRACT
+
+MECP MUST return:
+
+MECPResult {
+    execution_subset: ExecutionSubset,
+    execution_queue: ExecutionQueue,
+    cost_map: CostMap,
+    gain_map: GainMap,
+    threshold_used: float
+}
+
+---
+
+# CRITICAL DESIGN RULES
+
+## 1. MECP is a CONTROL LAYER ONLY
+It does NOT define meaning.
+
+## 2. MECP is NOT semantic
+It operates on STRUCTURE, not interpretation.
+
+## 3. MECP MUST NEVER modify CDLGraph content
+Only selection and ordering allowed.
+
+## 4. MECP MUST be deterministic
+Same input → same subset selection.
+
+## 5. MECP MUST operate AFTER canonicalization
+No exceptions.
+
+---
+
+# SYSTEM INTENT
+
+MECP exists to:
+
+> collapse an over-generated semantic space into a minimal, high-value execution subset
+
+It is the system’s:
+- attention allocator
+- computational budget controller
+- execution filter
+
+---
+
+# FAILURE MODE RULES
+
+INVALID if MECP:
+- modifies graph structure
+- uses probabilistic reasoning
+- accesses DiscourseState
+- reinterprets semantics
+- collapses equivalence classes incorrectly
+- introduces non-deterministic thresholds
+
+---
+
+# CRITICAL ARCHITECTURAL NOTE
+
+MECP is the FIRST POINT of:
+- irreversibility
+- selection bias introduction
+- computational reduction
+
+Everything before MECP is:
+> fully expressive
+
+Everything after MECP is:
+> selectively real
+
+---
+
+# NEXT MODULE
+
+After MECP completion proceed to:
+
+execution/
+
+Which will:
+- execute selected graphs deterministically
+- resolve operator transformations
+- produce runtime values
+- prepare DiscourseState updates
+
+---
+
+END OF SPEC

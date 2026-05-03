@@ -1,0 +1,256 @@
+PROJECT: L-CDEA
+MODULE: trace/provenance_display/
+
+PURPOSE:
+Surface provenance information for retrieved knowledge directly in query output and trace logs.
+
+Current state:
+- Provenance is correctly stored in DiscourseState
+- Definition retrieval returns correct values
+- Trace does NOT display:
+    source_path
+    chunk_id
+    location
+    extraction_method
+    confidence
+
+This limits observability and debugging.
+
+Desired behavior:
+Every retrieved value should clearly show where it came from.
+
+---
+
+# POSITION IN PIPELINE
+
+Query
+→ Router
+→ Planner
+→ Retrieval / Execution
+→ Provenance Lookup (THIS MODULE)
+→ Output + Trace
+
+---
+
+# DIRECTORY STRUCTURE
+
+l_cdea/trace/provenance_display/
+├── __init__.py
+├── formatter.py
+├── extractor.py
+├── config.py
+└── tests.py
+
+---
+
+# CORE TYPES
+
+DisplayedProvenance {
+  source_path: Optional[str]
+  chunk_id: Optional[str]
+  location: Optional[str]
+  extraction_method: str
+  confidence: float
+  trace_id: str
+}
+
+---
+
+# PROVENANCE EXTRACTION
+
+extractor.py:
+
+extract_provenance(node_or_value) -> Tuple[DisplayedProvenance, ...]
+
+Rules:
+
+1. Pull provenance entries from:
+   - DiscourseNode.provenance
+   - ProvenancedValue.provenance
+
+2. Convert to DisplayedProvenance
+
+3. Preserve ordering:
+   - highest confidence first
+   - deterministic tie-break
+
+4. Deduplicate by trace_id
+
+---
+
+# OUTPUT FORMATTER
+
+formatter.py:
+
+format_provenance(entries) -> str
+
+Default format:
+
+[source: <file> | chunk: <id> | loc: <location> | conf: <confidence>]
+
+Example:
+
+Velocity is displacement over time.
+  [source: physics_terms.txt | chunk: chunk_9f82a1c3 | loc: line:1 | conf: 0.92]
+
+Multiple entries:
+
+Acceleration is the rate of change of velocity.
+  [source: physics_terms.txt | chunk: chunk_a1b2c3d4 | loc: line:3 | conf: 0.91]
+  [source: textbook_v1.txt | chunk: chunk_ff91aa22 | loc: page:12 | conf: 0.87]
+
+---
+
+# TRACE INTEGRATION
+
+Modify trace output:
+
+Add section:
+
+[PROVENANCE]
+
+For each returned value:
+
+term: velocity
+entries:
+  - source_path: physics_terms.txt
+    chunk_id: chunk_9f82a1c3
+    location: line:1
+    extraction_method: definition_extractor
+    confidence: 0.92
+    trace_id: ...
+
+---
+
+# CLI OUTPUT CHANGE
+
+Current:
+
+[Entity] Velocity is displacement over time.
+
+New:
+
+[Entity] Velocity is displacement over time.
+  [source: physics_terms.txt | chunk: chunk_9f82a1c3 | loc: line:1 | conf: 0.92]
+
+Rules:
+
+1. Display provenance only when available
+2. Fallback outputs (definition_of(x)) show:
+   [no provenance]
+
+---
+
+# CONFIG OPTIONS
+
+config.py:
+
+ProvenanceDisplayConfig {
+  enabled: bool = True
+  max_entries: int = 3
+  show_trace_id: bool = False
+  show_confidence: bool = True
+}
+
+Optional CLI flag:
+
+--no-provenance
+
+---
+
+# PRIORITY RULES
+
+When multiple provenance entries exist:
+
+Sort by:
+1. confidence (desc)
+2. salience (if available)
+3. timestamp_index (desc)
+4. deterministic tie-break
+
+Limit to max_entries
+
+---
+
+# HARD RULES
+
+1. Provenance display MUST be deterministic.
+2. Must NOT modify stored provenance.
+3. Must NOT affect execution or retrieval logic.
+4. Must work for:
+   - definition retrieval
+   - dataset lookup
+   - execution results
+5. Must NOT break existing trace format.
+6. Must degrade gracefully when provenance missing.
+
+---
+
+# VALIDATION EXAMPLES
+
+Example 1 — single source:
+
+Input:
+  "what is velocity"
+
+Output:
+
+Velocity is displacement over time.
+  [source: physics_terms.txt | chunk: chunk_... | loc: line:1 | conf: ...]
+
+---
+
+Example 2 — multiple sources:
+
+Merged definition from 2 documents
+
+Output shows top N entries.
+
+---
+
+Example 3 — no provenance:
+
+Input:
+  "what is luminiferous ether"
+
+Output:
+
+definition_of(luminiferous ether)
+  [no provenance]
+
+---
+
+Example 4 — dataset lookup:
+
+Input:
+  "capital of France"
+
+Output:
+
+Paris
+  [source: country_capitals_v1 | conf: 1.0]
+
+---
+
+# IMPLEMENTATION PRIORITY
+
+1. trace/provenance_display/extractor.py
+2. trace/provenance_display/formatter.py
+3. integrate into run.py output printing
+4. integrate into trace logger
+5. config.py
+6. tests.py
+
+---
+
+# DESIGN INTENT
+
+Make knowledge transparent.
+
+Every answer should answer:
+- where did this come from?
+- how reliable is it?
+
+---
+
+# END OF SPEC

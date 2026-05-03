@@ -1,0 +1,3 @@
+from .operators import register_legal_operators, register_governed_operators
+register_legal_operators()
+register_governed_operators()

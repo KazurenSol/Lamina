@@ -1,0 +1,334 @@
+PROJECT: L-CDEA
+MODULE: ingestion/document_scaling/
+
+PURPOSE:
+Scale ingestion from small dictionary-style files to structured multi-paragraph documents (textbooks, notes, articles) while preserving determinism, provenance fidelity, and extraction accuracy.
+
+Current state:
+- Dictionary mode: line-based chunks, high recall for definitions.
+- Document mode: paragraph chunks (min_chars=40), limited structure awareness.
+- No notion of headings, sections, or hierarchical context.
+
+Desired behavior:
+Ingest structured documents with:
+  - heading-aware chunking
+  - section identifiers
+  - paragraph indexing
+  - improved extraction context
+  - per-section reporting
+
+---
+
+# POSITION IN PIPELINE
+
+Document Input
+→ Loader
+→ Structured Chunking (THIS MODULE)
+→ Ingestion Router
+→ Extractors (definitions, relationships, etc.)
+→ Validation
+→ DiscourseState
+→ Persistence
+
+---
+
+# DIRECTORY STRUCTURE
+
+l_cdea/ingestion/document_scaling/
+├── __init__.py
+├── parser.py
+├── chunker.py
+├── section_model.py
+├── metadata.py
+├── trace.py
+└── tests.py
+
+---
+
+# CORE TYPES
+
+DocumentSection {
+  section_id: str
+  heading: Optional[str]
+  level: int
+  parent_id: Optional[str]
+  text: str
+  start_line: int
+  end_line: int
+}
+
+StructuredChunk {
+  chunk_id: str
+  section_id: str
+  heading: Optional[str]
+  text: str
+  paragraph_index: int
+  location: str
+}
+
+DocumentStructure {
+  sections: Tuple[DocumentSection, ...]
+}
+
+---
+
+# PARSER RULES
+
+parser.py:
+
+parse_document(text) -> DocumentStructure
+
+Detect headings using deterministic rules:
+
+1. Line starts with:
+   - "#", "##", "###" → markdown headings
+   - ALL CAPS line (≤ 10 words)
+   - line ending with ":" (short length)
+
+2. Heading level:
+   - "#" count or inferred hierarchy
+
+3. Build tree:
+   - parent-child relationships
+   - nested sections allowed
+
+Fallback:
+  entire document is one section
+
+---
+
+# CHUNKING RULES
+
+chunker.py:
+
+chunk_structured(document_structure, mode="document") -> Tuple[StructuredChunk, ...]
+
+Rules:
+
+1. Split section text into paragraphs (double newline)
+2. Each paragraph becomes a chunk if:
+   - length ≥ min_chunk_chars (default 40)
+3. Attach:
+   - section_id
+   - heading
+   - paragraph_index
+   - location = "section:<id>:para:<index>"
+4. Generate chunk_id via existing deterministic hash:
+   make_chunk_id(source_path, mode, location, text)
+
+---
+
+# METADATA ENRICHMENT
+
+metadata.py:
+
+build_metadata(chunk):
+
+Add to node metadata:
+
+{
+  "category": "definition" | "relationship" | ...
+  "term": <term>
+  "definition_text": <text>
+  "section_id": <section_id>
+  "heading": <heading>
+  "paragraph_index": <int>
+  "location": <location>
+  "ingestion_mode": "document_structured"
+}
+
+---
+
+# EXTRACTION IMPROVEMENTS
+
+Context-aware extraction:
+
+1. Prefer definitions when:
+   - chunk contains "is", "defined as"
+   - heading contains keywords like:
+       "definition", "overview", "introduction"
+
+2. Boost confidence if:
+   - term appears in heading
+
+3. Relationship extraction unchanged but benefits from cleaner chunks
+
+---
+
+# PROVENANCE REQUIREMENTS
+
+Each Provenance entry MUST include:
+
+source_path
+chunk_id
+location
+section_id
+heading
+paragraph_index
+extraction_method
+confidence
+trace_id
+
+---
+
+# TRACE REQUIREMENTS
+
+trace.py:
+
+DocumentScalingTrace {
+  total_sections
+  total_chunks
+  rejected_chunks
+  sections: Tuple[Dict, ...]
+}
+
+Each section trace includes:
+  section_id
+  heading
+  level
+  chunk_count
+
+---
+
+# BATCH INGESTION INTEGRATION
+
+batch_ingest_directory MUST support:
+
+mode="document_structured"
+
+Behavior:
+
+1. parse document → sections
+2. chunk per section
+3. ingest chunks normally
+4. aggregate report per file
+
+---
+
+# REPORTING
+
+Batch report additions:
+
+Per-file:
+  sections_detected
+  chunks_generated
+  definitions_extracted
+  relationships_extracted
+
+---
+
+# HARD RULES
+
+1. Parsing MUST be deterministic.
+2. No ML or NLP models.
+3. No external libraries required.
+4. Chunk boundaries MUST be reproducible.
+5. Provenance MUST be preserved.
+6. Existing dictionary mode MUST remain unchanged.
+7. Existing document mode MUST remain available.
+8. Structured mode MUST be opt-in.
+9. Heading detection MUST be rule-based only.
+10. No mutation of DiscourseState beyond normal ingestion.
+
+---
+
+# VALIDATION EXAMPLES
+
+Example 1 — simple headings:
+
+Input:
+
+# Mechanics
+
+Force is mass times acceleration.
+
+## Kinematics
+
+Velocity is displacement over time.
+
+Expected:
+  sections=2
+  chunks=2
+  correct section_id + heading attached
+
+---
+
+Example 2 — no headings:
+
+Input:
+  plain paragraphs
+
+Expected:
+  one section
+  normal chunking
+
+---
+
+Example 3 — nested headings:
+
+# Physics
+## Mechanics
+### Forces
+
+Expected:
+  hierarchy preserved
+  parent-child links correct
+
+---
+
+Example 4 — extraction improvement:
+
+Heading:
+  "Definitions"
+
+Paragraph:
+  "Force is mass times acceleration."
+
+Expected:
+  higher confidence definition extraction
+
+---
+
+# IMPLEMENTATION PRIORITY
+
+1. parser.py
+2. section_model.py
+3. chunker.py
+4. metadata.py
+5. trace.py
+6. integrate into knowledge_importer (mode="document_structured")
+7. integrate into batch ingestion
+8. tests.py
+9. CLI validation
+
+---
+
+# SUCCESS CRITERIA
+
+Given a multi-section document:
+
+- sections correctly detected
+- chunks correctly assigned
+- definitions extracted with section context
+- relationships extracted
+- provenance includes section + paragraph data
+- batch report shows structured stats
+
+---
+
+# DESIGN INTENT
+
+Bridge from:
+  dictionary ingestion
+
+to:
+  real-world documents
+
+while preserving:
+  determinism
+  traceability
+  compositional reasoning compatibility
+
+---
+
+# END OF SPEC

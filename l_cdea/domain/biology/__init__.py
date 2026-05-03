@@ -1,0 +1,3 @@
+from .operators import register_biology_operators, register_governed_operators
+register_biology_operators()
+register_governed_operators()

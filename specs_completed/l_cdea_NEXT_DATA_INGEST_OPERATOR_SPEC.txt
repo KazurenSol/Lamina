@@ -1,0 +1,31 @@
+PROJECT: L-CDEA
+MODULE: core/operators (extension)
+
+PURPOSE:
+Allow structured data entry into system.
+
+---
+
+# OPERATOR
+
+LOAD_DATA(source) → ORDERED_COLLECTION
+
+---
+
+# RULES
+
+1. Source MUST be deterministic
+2. Data MUST be typed
+3. Output MUST be compatible with CDL
+4. Must integrate with DiscourseState
+
+---
+
+# EXAMPLE
+
+LOAD_DATA("us_state_capitals.json")
+→ Mapping(State → Capital)
+
+---
+
+END OF SPEC

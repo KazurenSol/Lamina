@@ -1,0 +1,215 @@
+PROJECT: L-CDEA (Lamina CDL–Discourse Execution Architecture)
+MODULE: core/compiler/
+
+STATUS:
+core/parser/ COMPLETE + VERIFIED
+Output contract: ParsedInput (deterministic + lossless + frozen presemantic frame set)
+
+---
+
+# PURPOSE OF THIS MODULE
+
+The compiler is the **first semantic commitment layer**.
+
+It converts:
+
+ParsedInput (lossless ambiguity representation)
+→
+CDLGraph (typed semantic execution graph)
+
+This is the FIRST point where:
+- meaning is selected
+- types are enforced
+- operators are bound
+
+---
+
+# POSITION IN PIPELINE
+
+Input →
+Parser →
+Type Resolution →
+Compiler →
+CAS →
+MECP →
+Executor →
+DiscourseState →
+Trace
+
+---
+
+# HARD INVARIANTS
+
+1. Compiler is deterministic
+2. Compiler is stateless (except operator registry access)
+3. Compiler MUST resolve types before graph construction
+4. Compiler MAY NOT execute MECP pruning (only structure building)
+5. Compiler MUST NOT mutate DiscourseState
+6. Compiler MUST produce at least one valid CDLGraph or raise error
+
+---
+
+# DIRECTORY STRUCTURE
+
+l_cdea/core/compiler/
+│
+├── __init__.py
+├── resolver.py
+├── builder.py
+├── binding.py
+├── strategy.py
+└── exceptions.py
+
+---
+
+# 1. resolver.py — TYPE RESOLUTION ENGINE
+
+PURPOSE:
+Map PreSemanticFrame → candidate typed interpretations
+
+RULES:
+- produces multiple typed interpretations per frame
+- does NOT select final interpretation (MECP handles later)
+- uses ONLY core/types registry
+
+OUTPUT:
+TypedInterpretationSet
+
+---
+
+# 2. binding.py — OPERATOR BINDING LAYER
+
+PURPOSE:
+Match typed interpretations → CDL operators
+
+RULES:
+- matches TypeSignature → CDLOperator signature
+- rejects invalid bindings
+- supports multiple valid operator matches per frame
+
+OUTPUT:
+OperatorBindingSet
+
+---
+
+# 3. builder.py — CDL GRAPH CONSTRUCTION
+
+PURPOSE:
+Construct initial CDLGraph from operator bindings
+
+RULES:
+- builds DAG structure only
+- does NOT execute graph
+- does NOT reorder based on MECP
+- preserves all valid operator paths
+
+OUTPUT:
+CDLGraph (unexecuted)
+
+---
+
+# 4. strategy.py — DISAMBIGUATION STRATEGY ENGINE
+
+PURPOSE:
+Define structural rules for handling ambiguity BEFORE MECP
+
+RULES:
+- NO pruning
+- NO scoring
+- NO ranking
+- ONLY grouping of valid interpretations
+
+Example strategies:
+- parallel graph expansion
+- mirrored operator branches
+- fallback GENERIC operator routing
+
+OUTPUT:
+InterpretationStrategySet
+
+---
+
+# 5. exceptions.py
+
+DEFINE:
+
+class CompilerError(Exception):
+    pass
+
+class TypeResolutionError(CompilerError):
+    pass
+
+class BindingError(CompilerError):
+    pass
+
+class GraphConstructionError(CompilerError):
+    pass
+
+---
+
+# OUTPUT CONTRACT
+
+Compiler MUST return:
+
+CompiledOutput {
+    graphs: List[CDLGraph],
+    bindings: OperatorBindingSet,
+    interpretations: TypedInterpretationSet
+}
+
+---
+
+# CRITICAL DESIGN RULES
+
+## 1. No MECP inside compiler
+Compiler MUST NOT prune or optimize.
+
+## 2. No execution allowed
+Graph must remain inert.
+
+## 3. No DiscourseState access
+Compiler is stateless with respect to memory.
+
+## 4. Full ambiguity preservation
+All valid interpretations MUST be emitted.
+
+## 5. Type-first construction
+No operator may be bound without validated TypeSignature match.
+
+---
+
+# DESIGN INTENT
+
+The compiler is:
+
+> a deterministic ambiguity-expansion system that converts structured language into fully typed semantic execution graphs WITHOUT collapsing meaning.
+
+It is intentionally "over-generative" so that MECP can later prune safely.
+
+---
+
+# FAILURE MODE RULES
+
+INVALID if compiler:
+- removes interpretations
+- selects single meaning prematurely
+- uses salience or memory bias
+- invokes MECP
+- mutates DiscourseState
+
+---
+
+# NEXT MODULE
+
+After completion proceed to:
+
+core/normalization/canonicalizer/
+
+Which will:
+- merge equivalent CDL graphs
+- normalize operator structures
+- prepare MECP-ready unified semantic space
+
+---
+
+END OF SPEC

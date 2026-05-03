@@ -1,0 +1,432 @@
+Good. Now we move from **specification → implementation mapping**. This is where most systems either become buildable or silently collapse under vague module boundaries.
+
+Below is a **Claude Code–ready project structure + module contract map** for your L-CDEA system.
+
+---
+
+# L-CDEA IMPLEMENTATION BLUEPRINT v1.0
+
+## (Module-Level Architecture for Claude Code)
+
+---
+
+# 0. CORE DESIGN PRINCIPLE
+
+> Every layer is a physically separable module with strict input/output contracts.
+
+No module is allowed to:
+
+* mutate another module’s internal state directly
+* bypass MECP
+* bypass type system
+* bypass canonicalization
+
+---
+
+# 1. PROJECT STRUCTURE
+
+```text id="proj_root"
+l_cdea/
+│
+├── core/
+│   ├── cdl/
+│   ├── types/
+│   ├── operators/
+│   └── compiler/
+│
+├── discourse/
+│   ├── state/
+│   ├── salience/
+│   └── memory_graph/
+│
+├── control/
+│   ├── mecp/
+│   ├── scheduler/
+│   └── pruning/
+│
+├── policy/
+│   ├── dpk/
+│   └── discourse_policy/
+│
+├── normalization/
+│   ├── canonicalizer/
+│   └── equivalence_engine/
+│
+├── execution/
+│   ├── runtime/
+│   ├── graph_executor/
+│   └── environment_bridge/
+│
+├── interface/
+│   ├── input_parser/
+│   ├── output_formatter/
+│   └── trace_logger/
+│
+└── system/
+    ├── bootstrap.py
+    ├── config.py
+    └── invariants.py
+```
+
+---
+
+# 2. MODULE CONTRACTS
+
+Each module MUST implement strict I/O contracts.
+
+---
+
+# 2.1 CORE / CDL MODULE
+
+## Purpose:
+
+Defines semantic truth operators.
+
+### Responsibilities:
+
+* define operators
+* enforce type signatures
+* construct CDL graphs
+
+### Output:
+
+```text id="cdl_out"
+CDLGraph {
+  nodes: Operators
+  edges: typed relations
+}
+```
+
+### Constraints:
+
+* no runtime memory
+* no discourse access
+* no MECP logic
+
+---
+
+# 2.2 TYPES MODULE
+
+## Purpose:
+
+Global semantic typing system.
+
+### Core types:
+
+```text id="types_core"
+Entity
+Event
+State
+Process
+Relation
+Constraint
+Abstraction
+```
+
+### Rule:
+
+All operators MUST declare:
+
+```text id="type_rule"
+input_types → output_type
+```
+
+---
+
+# 2.3 COMPILER MODULE
+
+## Purpose:
+
+Lexeme → CDL graph conversion
+
+### Pipeline:
+
+```text id="compile_flow"
+Input text
+→ tokenization
+→ sense resolution
+→ typed operator mapping
+→ CDL graph
+```
+
+### Constraints:
+
+* no pruning (MECP happens later)
+* no persistence
+* deterministic output required
+
+---
+
+# 2.4 DISCOURSE MODULE
+
+## 2.4.1 DiscourseState
+
+```text id="ds_struct"
+nodes
+edges
+salience
+temporal_index
+```
+
+## Responsibilities:
+
+* store canonical results
+* maintain memory graph
+* track evolution of meaning
+
+---
+
+## 2.4.2 Salience Engine
+
+* decay function
+* reinforcement updates
+* activation weighting
+
+---
+
+# 2.5 CONTROL MODULE (MECP)
+
+## Purpose:
+
+Compute minimal necessary expansion
+
+### Core function:
+
+```text id="mecp_func"
+should_expand(node):
+    return (info_gain / cost) > threshold
+```
+
+### Responsibilities:
+
+* prune interpretation branches
+* limit graph expansion depth
+* enforce early stopping
+
+### Constraint:
+
+* CANNOT modify semantics
+
+---
+
+# 2.6 POLICY MODULE (DPK)
+
+## Purpose:
+
+Controls discourse behavior only.
+
+### Allowed:
+
+* ordering of explanations
+* ambiguity presentation style
+* traversal order of DiscourseState
+
+### Forbidden:
+
+* modifying CDL
+* modifying meaning
+* altering types
+
+---
+
+# 2.7 NORMALIZATION MODULE (CANONICALIZER)
+
+## Purpose:
+
+Convert equivalent structures into canonical form.
+
+### Operations:
+
+* graph normalization
+* node merging
+* structural deduplication
+* triangle decomposition reduction
+
+---
+
+## Rule:
+
+```text id="canon_rule"
+canonical(A) == canonical(B) → A and B are identical
+```
+
+---
+
+# 2.8 EXECUTION MODULE
+
+## Purpose:
+
+Execute CDL graphs
+
+### Responsibilities:
+
+* traverse graph
+* execute operator transformations
+* produce results
+
+### Constraints:
+
+* no interpretation logic
+* no type resolution
+* no discourse access
+
+---
+
+# 2.9 ENVIRONMENT BRIDGE (OPTIONAL C)
+
+## Purpose:
+
+External feedback ingestion
+
+### Rule:
+
+> only updates DiscourseState
+
+Never modifies:
+
+* CDL
+* types
+* operators
+
+---
+
+# 2.10 INTERFACE MODULE
+
+## Responsibilities:
+
+* input parsing
+* output formatting
+* trace generation
+
+### Trace MUST include:
+
+```text id="trace_spec"
+input
+resolved_senses
+CDL_graph
+MECP_decisions
+canonical_output
+execution_result
+```
+
+---
+
+# 3. SYSTEM BOOTSTRAP FLOW
+
+```text id="boot_flow"
+1. parse input
+2. compile to CDL
+3. MECP prune
+4. canonicalize
+5. execute
+6. update discourse
+7. log trace
+```
+
+---
+
+# 4. GLOBAL INVARIANTS
+
+These are HARD constraints:
+
+## 4.1 Determinism
+
+Same input + same state → same output
+
+## 4.2 Layer isolation
+
+No module may access internal state of another module directly
+
+## 4.3 Type safety
+
+No untyped operations allowed in CDL
+
+## 4.4 Canonical consistency
+
+Equivalent graphs must normalize identically
+
+## 4.5 MECP supremacy over expansion
+
+No expansion without passing MECP
+
+---
+
+# 5. SYSTEM EXECUTION MODEL
+
+Two-phase pipeline:
+
+---
+
+## PHASE 1 — INTERPRETATION
+
+* lexical parsing
+* type assignment
+* CDL compilation
+
+---
+
+## PHASE 2 — CONTROLLED EXECUTION
+
+* MECP filtering
+* canonicalization
+* graph execution
+* discourse update
+
+---
+
+# 6. CRITICAL DESIGN PROPERTY
+
+This system is:
+
+> a **deterministic semantic compiler with controlled adaptive memory**
+
+NOT:
+
+* a language model
+* a chatbot
+* a reasoning heuristic system
+
+---
+
+# 7. WHAT THIS IMPLEMENTATION ENABLES
+
+You now have:
+
+### ✔ Formal semantics (CDL)
+
+### ✔ Memory persistence (DiscourseState)
+
+### ✔ Efficiency control (MECP)
+
+### ✔ Behavioral control (DPK)
+
+### ✔ Structural normalization (Canonicalizer)
+
+### ✔ Execution engine (Graph runtime)
+
+### ✔ Feedback loop (optional)
+
+---
+
+# 8. FINAL SYSTEM CLASSIFICATION
+
+> L-CDEA is a typed, deterministic, graph-based semantic execution engine with bounded adaptive memory and controlled discourse policy separation.
+
+---
+
+# NEXT STEP (IMPORTANT)
+
+If you proceed further, the next logical phase is:
+
+> **actual class/interface definitions + data structures + pseudocode per module**
+
+That is where we convert this into real Claude Code files.
+
+If you want, I can generate:
+
+* Python module skeletons
+* class definitions for every component
+* and a minimal runnable prototype structure
+
+That would be the first executable version of your system.
+

@@ -1,0 +1,325 @@
+PROJECT: L-CDEA
+MODULE: core/router/paraphrase_patterns/
+
+PURPOSE:
+Expand the router’s coverage of natural-language queries by adding deterministic paraphrase patterns that map diverse phrasings to existing operators—without introducing ambiguity or non-determinism.
+
+Current state:
+- Exact patterns supported:
+    "what is X"
+    "what does X depend on"
+    "what does X indirectly depend on"
+- Many equivalent queries fall back to generic compilation.
+
+Desired behavior:
+Map common paraphrases to:
+  GET_DEFINITION
+  GET_RELATIONSHIPS
+  GET_RELATIONSHIP_CLOSURE
+  COMPOSE_RELATIONSHIPS
+
+Examples:
+  "explain force"
+  "what affects force"
+  "what is force based on"
+  "show me force dependency chain"
+
+---
+
+# POSITION IN PIPELINE
+
+Input
+→ Parser
+→ Router (paraphrase patterns, THIS MODULE)
+→ Planner
+→ Execution / Retrieval
+
+Paraphrase matching occurs BEFORE generic fallback.
+
+---
+
+# DIRECTORY STRUCTURE
+
+l_cdea/core/router/paraphrase_patterns/
+├── __init__.py
+├── definition.py
+├── relationships.py
+├── composition.py
+├── normalization.py
+└── tests.py
+
+---
+
+# DESIGN PRINCIPLES
+
+1. Deterministic matching only (no ML, no fuzzy search in V1)
+2. Explicit phrase → operator mapping
+3. Minimal overlap between pattern groups
+4. Priority-based conflict resolution
+5. No modification to existing operators
+
+---
+
+# NORMALIZATION RULES
+
+normalization.py:
+
+normalize_query(text):
+
+1. lowercase
+2. strip punctuation
+3. collapse whitespace
+4. remove leading polite phrases:
+   - "please"
+   - "can you"
+   - "could you"
+   - "show me"
+   - "tell me"
+5. preserve key verbs
+
+Example:
+  "Can you explain force?"
+  → "explain force"
+
+---
+
+# DEFINITION PARAPHRASES
+
+definition.py:
+
+Patterns:
+
+1. "explain X"
+2. "tell me about X"
+3. "what is X about"
+4. "give definition of X"
+5. "define X" (already exists, keep)
+
+Mapping:
+
+→ discourse.GET_DEFINITION(term=X)
+
+Priority:
+  200 (same as existing definition patterns)
+
+---
+
+# RELATIONSHIP PARAPHRASES (ONE-HOP)
+
+relationships.py:
+
+Patterns:
+
+1. "what affects X"
+2. "what influences X"
+3. "what is X based on"
+4. "what determines X"
+5. "dependencies of X"
+6. "what does X rely on"
+
+Mapping:
+
+→ discourse.GET_RELATIONSHIPS(term=X, relation_type="depends_on")
+
+Priority:
+  190
+
+---
+
+# MULTI-HOP PARAPHRASES
+
+relationships.py:
+
+Patterns:
+
+1. "show dependency chain for X"
+2. "full dependencies of X"
+3. "all dependencies of X"
+4. "dependency graph for X"
+
+Mapping:
+
+→ discourse.GET_RELATIONSHIP_CLOSURE(term=X, relation_type="depends_on")
+
+Priority:
+  195
+
+---
+
+# COMPOSITION PARAPHRASES
+
+composition.py:
+
+Patterns:
+
+1. "what indirectly affects X"
+2. "what is X ultimately based on"
+3. "derived dependencies of X"
+4. "indirect dependencies of X"
+
+Mapping:
+
+→ discourse.COMPOSE_RELATIONSHIPS(term=X, relation_type="depends_on")
+
+Priority:
+  196
+
+---
+
+# SLOT EXTRACTION RULES
+
+Slot extraction MUST:
+
+1. Identify the main subject term X
+2. Remove auxiliary words:
+   - explain
+   - affects
+   - based on
+   - chain
+3. Preserve noun phrase integrity
+
+Example:
+
+"what affects force"
+→ term = "force"
+
+"show dependency chain for velocity"
+→ term = "velocity"
+
+---
+
+# CONFLICT RESOLUTION
+
+If multiple patterns match:
+
+Priority order:
+
+1. Definition (200)
+2. Composition (196)
+3. Multi-hop (195)
+4. One-hop (190)
+
+Tie-break:
+- longest pattern match
+- lexicographic fallback
+
+---
+
+# FALSE POSITIVE PREVENTION
+
+1. "what is force" MUST NOT map to relationships
+2. "what affects force" MUST NOT map to definition
+3. presence of "indirect", "ultimately" MUST force composition
+4. presence of "chain", "graph" MUST force closure
+
+---
+
+# HARD RULES
+
+1. No fuzzy matching in V1
+2. No ML models
+3. Deterministic matching only
+4. No change to existing operator behavior
+5. No change to planner semantics
+6. No change to DiscourseState
+7. All new patterns MUST be test-covered
+8. Generic fallback MUST still exist for unknown queries
+
+---
+
+# VALIDATION EXAMPLES
+
+Example 1:
+
+Input:
+  "explain force"
+
+Expected:
+  GET_DEFINITION(force)
+
+---
+
+Example 2:
+
+Input:
+  "what affects force"
+
+Expected:
+  GET_RELATIONSHIPS(force, depends_on)
+
+---
+
+Example 3:
+
+Input:
+  "show dependency chain for force"
+
+Expected:
+  GET_RELATIONSHIP_CLOSURE(force, depends_on)
+
+---
+
+Example 4:
+
+Input:
+  "what indirectly affects force"
+
+Expected:
+  COMPOSE_RELATIONSHIPS(force, depends_on)
+
+---
+
+Example 5:
+
+Input:
+  "tell me about velocity"
+
+Expected:
+  GET_DEFINITION(velocity)
+
+---
+
+Example 6:
+
+Input:
+  "random unrelated text"
+
+Expected:
+  generic fallback
+
+---
+
+# IMPLEMENTATION PRIORITY
+
+1. normalization.py
+2. definition.py
+3. relationships.py
+4. composition.py
+5. integrate into router pattern loader
+6. update slot_filler if needed
+7. tests.py
+8. CLI validation
+
+---
+
+# SUCCESS CRITERIA
+
+All of the following map correctly:
+
+"explain force"
+"what affects force"
+"what is force based on"
+"show dependency chain for force"
+"what indirectly affects force"
+
+And produce the same outputs as canonical queries.
+
+---
+
+# DESIGN INTENT
+
+Make the system usable without requiring strict query phrasing, while preserving full determinism.
+
+---
+
+# END OF SPEC

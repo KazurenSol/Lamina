@@ -1,0 +1,375 @@
+PROJECT: L-CDEA
+MODULE: ingestion/book_prep/
+
+PURPOSE:
+Prepare the system to ingest full books (hundreds of pages) in a controlled, resumable, and traceable way—without sacrificing determinism or data integrity.
+
+Current state:
+- Supports structured documents (sections + paragraphs)
+- Batch ingestion works per directory
+- No concept of:
+    - book identity
+    - chapters
+    - ingestion progress
+    - resumability
+    - partial failures at scale
+
+Desired behavior:
+Ingest large books safely with:
+  - book-level metadata
+  - chapter indexing
+  - ingestion manifests
+  - resumable progress
+  - idempotent re-ingestion
+
+---
+
+# POSITION IN PIPELINE
+
+Book Input (file or directory)
+→ Book Loader
+→ Book Structure Parser (THIS MODULE)
+→ Structured Chunking (document_scaling)
+→ Ingestion Router
+→ Extraction / Validation
+→ DiscourseState
+→ Persistence
+
+---
+
+# DIRECTORY STRUCTURE
+
+l_cdea/ingestion/book_prep/
+├── __init__.py
+├── book_model.py
+├── parser.py
+├── manifest.py
+├── checkpoint.py
+├── loader.py
+├── trace.py
+└── tests.py
+
+---
+
+# CORE TYPES
+
+BookMetadata {
+  book_id: str
+  title: Optional[str]
+  author: Optional[str]
+  source_path: str
+  total_lines: int
+}
+
+BookChapter {
+  chapter_id: str
+  title: Optional[str]
+  start_line: int
+  end_line: int
+  section_ids: Tuple[str, ...]
+}
+
+BookStructure {
+  metadata: BookMetadata
+  chapters: Tuple[BookChapter, ...]
+}
+
+---
+
+# BOOK IDENTIFICATION
+
+book_id MUST be deterministic:
+
+book_id = sha256(source_path + file_size + first_1k_chars)[:16]
+
+Rules:
+1. Same book → same book_id
+2. Different books → different IDs
+3. No randomness
+
+---
+
+# PARSER RULES
+
+parser.py:
+
+parse_book(text) -> BookStructure
+
+Detect chapters via:
+
+1. Lines matching:
+   - "Chapter X"
+   - "CHAPTER X"
+   - "Chapter X: Title"
+2. Markdown headers "# Chapter"
+3. Large ALL CAPS headings
+
+Fallback:
+  entire document = single chapter
+
+Each chapter maps to:
+  line range
+  section IDs (from document_scaling)
+
+---
+
+# MANIFEST SYSTEM
+
+manifest.py:
+
+BookManifest {
+  book_id
+  source_path
+  chapters_total
+  chapters_completed
+  chunks_total
+  chunks_processed
+  nodes_added
+  edges_added
+  last_checkpoint
+  status: "in_progress" | "complete" | "failed"
+}
+
+Stored at:
+
+.l_cdea/manifests/<book_id>.json
+
+Rules:
+1. Updated after each chapter
+2. Deterministic JSON (sorted keys)
+3. No partial writes (atomic save)
+
+---
+
+# CHECKPOINT SYSTEM
+
+checkpoint.py:
+
+Checkpoint {
+  book_id
+  chapter_id
+  chunk_index
+  timestamp
+}
+
+Rules:
+1. Save after each chunk batch or chapter
+2. Enables resume from:
+   last processed chunk
+3. Stored in manifest
+
+---
+
+# RESUMABLE INGESTION
+
+loader.py:
+
+ingest_book(path, resume=True)
+
+Behavior:
+
+IF manifest exists AND resume=True:
+  load manifest
+  skip completed chapters
+  resume from checkpoint
+
+ELSE:
+  start fresh
+
+Rules:
+1. MUST NOT re-ingest completed chunks
+2. MUST preserve determinism
+3. MUST NOT duplicate nodes or edges
+
+---
+
+# IDEMPOTENCY RULES
+
+Re-running ingestion:
+
+1. same book_id → same chunks → same chunk_ids
+2. existing nodes:
+   - merge provenance
+   - do not duplicate
+3. existing edges:
+   - merge provenance
+
+---
+
+# METADATA ENRICHMENT
+
+Each node MUST include:
+
+{
+  "book_id": <book_id>
+  "chapter_id": <chapter_id>
+  "section_id": <section_id>
+  "heading": <heading>
+  "paragraph_index": <int>
+}
+
+Provenance MUST include:
+  book_id
+  chapter_id
+
+---
+
+# TRACE REQUIREMENTS
+
+trace.py:
+
+BookIngestionTrace {
+  book_id
+  chapters_total
+  chapters_processed
+  chunks_processed
+  nodes_added
+  edges_added
+  resumed: bool
+}
+
+---
+
+# FAILURE HANDLING
+
+If ingestion fails:
+
+1. manifest.status = "failed"
+2. checkpoint remains valid
+3. resume continues from last safe point
+
+---
+
+# BATCH INTEGRATION
+
+batch_ingest_directory MUST support:
+
+mode="book"
+
+Behavior:
+1. detect book files
+2. run ingest_book() per file
+3. aggregate per-book report
+
+---
+
+# CLI SUPPORT
+
+New command:
+
+python3 -m l_cdea.book_ingest <file> [--resume]
+
+Options:
+  --resume (default True)
+  --no-resume
+  --state-path
+  --max-chapters
+
+---
+
+# HARD RULES
+
+1. All IDs MUST be deterministic.
+2. No randomness or timestamps in identity.
+3. No duplication of nodes or edges.
+4. Manifest MUST be atomic.
+5. Resume MUST NOT skip unprocessed chunks.
+6. Resume MUST NOT reprocess completed chunks.
+7. No external dependencies required.
+8. Must work on plain text files.
+9. Must not degrade small-file ingestion.
+10. Provenance MUST remain intact.
+
+---
+
+# VALIDATION EXAMPLES
+
+Example 1 — simple book:
+
+Input:
+  2 chapters
+
+Expected:
+  chapters_total=2
+  manifest updated
+  chunks processed per chapter
+
+---
+
+Example 2 — resume:
+
+Interrupt after chapter 1
+
+Restart:
+  resumes at chapter 2
+
+---
+
+Example 3 — idempotency:
+
+Run ingestion twice
+
+Expected:
+  no duplicate nodes
+  provenance merged
+
+---
+
+Example 4 — failure:
+
+Malformed section causes error
+
+Expected:
+  manifest.status="failed"
+  resume continues later
+
+---
+
+# IMPLEMENTATION PRIORITY
+
+1. book_model.py
+2. parser.py
+3. manifest.py
+4. checkpoint.py
+5. loader.py
+6. trace.py
+7. CLI integration
+8. batch integration
+9. tests.py
+10. validation runs
+
+---
+
+# SUCCESS CRITERIA
+
+Given a multi-chapter book:
+
+- book_id generated deterministically
+- chapters detected
+- ingestion proceeds chapter-by-chapter
+- manifest tracks progress
+- interruption allows resume
+- re-run produces no duplicates
+- queries work normally afterward
+
+---
+
+# DESIGN INTENT
+
+Bridge from:
+
+structured documents
+
+to:
+
+full-scale book ingestion
+
+while preserving:
+  determinism
+  traceability
+  fault tolerance
+  reproducibility
+
+---
+
+# END OF SPEC

@@ -1,0 +1,349 @@
+PROJECT: L-CDEA
+MODULE: domain/legal/
+
+PURPOSE:
+Provide a high-complexity domain pack for rule-based reasoning, conflict resolution, and conditional logic under constraints.
+
+---
+
+# DOMAIN ROLE
+
+Legal Domain V1 is designed to stress:
+
+1. Ambiguity resolution
+2. Rule precedence and hierarchy
+3. Conditional logic and exceptions
+4. Conflict detection and resolution
+5. MECP decision quality under competing valid interpretations
+6. DiscourseState memory consistency with contradictory inputs
+
+This domain is intentionally one of the hardest for structured reasoning.
+
+---
+
+# DIRECTORY STRUCTURE
+
+l_cdea/domain/legal/
+├── __init__.py
+├── operators.py
+├── types.py
+├── rules.py
+├── precedence.py
+├── contradiction.py
+├── compiler_bindings.py
+├── equivalence_rules.py
+├── patterns.py
+├── examples.py
+└── tests.py
+
+---
+
+# LEGAL DOMAIN TYPES (mapped to core)
+
+Law
+  maps_to: Constraint
+
+Rule
+  maps_to: Constraint
+
+Clause
+  maps_to: Constraint
+
+Condition
+  maps_to: Constraint
+
+Obligation
+  maps_to: Process
+
+Permission
+  maps_to: State
+
+Prohibition
+  maps_to: Constraint
+
+Exception
+  maps_to: Constraint
+
+Case
+  maps_to: Event
+
+Actor
+  maps_to: Entity
+
+Action
+  maps_to: Process
+
+Outcome
+  maps_to: State
+
+Violation
+  maps_to: Event
+
+Resolution
+  maps_to: Process
+
+---
+
+# LEGAL OPERATORS V1
+
+APPLY_RULE(rule, case) -> Outcome
+
+CHECK_CONDITION(condition, context) -> Constraint
+
+EVALUATE_OBLIGATION(actor, action) -> State
+
+CHECK_PERMISSION(actor, action) -> State
+
+CHECK_PROHIBITION(actor, action) -> Constraint
+
+DETECT_VIOLATION(rule, case) -> Event
+
+RESOLVE_CONFLICT(ruleA, ruleB) -> Resolution
+
+APPLY_EXCEPTION(rule, exception) -> Rule
+
+ESTABLISH_PRECEDENCE(ruleA, ruleB) -> Constraint
+
+INTERPRET_CLAUSE(clause, context) -> Constraint
+
+CLASSIFY_CASE(case) -> CaseType
+
+VALIDATE_COMPLIANCE(case, ruleset) -> State
+
+---
+
+# REQUIRED CORE OPERATOR MAPPINGS
+
+APPLY_RULE
+= EXECUTE(rule as transformation)
+
+CHECK_CONDITION
+= VALIDATE(condition)
+
+CHECK_PERMISSION
+= SELECT(allowed / not allowed)
+
+CHECK_PROHIBITION
+= VALIDATE(not allowed)
+
+DETECT_VIOLATION
+= MATCH(rule violation pattern)
+
+RESOLVE_CONFLICT
+= COMPARE(ruleA, ruleB) + SELECT(precedence)
+
+APPLY_EXCEPTION
+= TRANSFORM(rule under exception constraint)
+
+---
+
+# PRECEDENCE RULES
+
+Legal reasoning depends on rule hierarchy.
+
+Precedence MUST be explicitly defined:
+
+Example hierarchy:
+
+1. Constitutional law
+2. Statutory law
+3. Regulatory rules
+4. Case law
+5. Local rules
+
+RULE:
+
+Higher precedence rules override lower ones.
+
+---
+
+# CONFLICT RESOLUTION RULES
+
+When two rules conflict:
+
+1. Check precedence
+2. Apply higher-priority rule
+3. If equal precedence:
+   - apply most specific rule
+4. If still ambiguous:
+   - mark unresolved and defer
+
+---
+
+# CANONICALIZATION RULES
+
+CAS MUST detect equivalence under:
+
+- logically equivalent clauses
+- reordered conditions
+- nested conditional flattening
+
+Example:
+
+IF A AND B THEN X
+is equivalent to:
+IF B AND A THEN X
+
+IF NOT (NOT A)
+is equivalent to:
+A
+
+---
+
+# MECP STRESS CASES
+
+Example 1:
+Task:
+  "Is this action legal under rule X?"
+
+Possible graphs:
+  G1: direct rule evaluation
+  G2: full rule hierarchy traversal
+  G3: simulate case outcomes
+
+Expected MECP preference:
+  G1 if rule directly applies
+
+---
+
+Example 2:
+Task:
+  "Resolve conflict between two laws"
+
+Possible graphs:
+  G1: apply precedence rules
+  G2: compare specificity
+  G3: evaluate both outcomes
+
+Expected MECP preference:
+  G1 then fallback to G2
+
+---
+
+Example 3:
+Task:
+  "Check compliance with a ruleset"
+
+Possible graphs:
+  G1: evaluate all rules directly
+  G2: classify case then evaluate subset
+  G3: simulate violations
+
+Expected MECP preference:
+  G2 (efficient filtering)
+
+---
+
+# EXECUTION RULES
+
+1. All legal operators MUST be deterministic
+2. No probabilistic interpretation in V1
+3. No external legal databases in V1
+4. All rule applications MUST be traceable
+5. Conflicts MUST be explicitly resolved or flagged
+
+---
+
+# DISCOURSESTATE STORAGE RULES
+
+Legal memory must store:
+
+- rules and clauses
+- precedence relationships
+- past cases
+- violations and resolutions
+
+Example:
+
+Rule:
+  PROHIBIT(speed > 65)
+
+Case:
+  Actor drove at 70 mph
+
+Result:
+  Violation detected
+
+---
+
+# OPERATOR DISCOVERY RULES
+
+System MAY propose new operators if repeated patterns occur.
+
+Example:
+
+CHECK_LEGALITY(action, ruleset)
+=
+APPLY_RULE + CHECK_PERMISSION + CHECK_PROHIBITION
+
+Must meet standard validation requirements before registration.
+
+---
+
+# INITIAL VALIDATION EXAMPLES
+
+Example 1:
+Input:
+  "Is speeding illegal?"
+
+Expected graph:
+  CHECK_PROHIBITION(speeding)
+
+---
+
+Example 2:
+Input:
+  "Does rule A override rule B?"
+
+Expected graph:
+  ESTABLISH_PRECEDENCE(A, B)
+
+---
+
+Example 3:
+Input:
+  "Is this case compliant with the law?"
+
+Expected graph:
+  VALIDATE_COMPLIANCE(case, ruleset)
+
+---
+
+Example 4:
+Input:
+  "Resolve conflict between two clauses"
+
+Expected graph:
+  RESOLVE_CONFLICT(clauseA, clauseB)
+
+---
+
+# HARD RULES
+
+1. Legal domain MUST NOT alter CDL semantics
+2. Legal domain MUST enforce explicit precedence rules
+3. Legal domain MUST remain deterministic
+4. Legal domain MUST not bypass CAS
+5. Legal domain MUST not bypass MECP
+6. Legal domain MUST not use probabilistic interpretation in V1
+7. Legal domain MAY propose operators but MUST NOT auto-register
+8. Legal domain MUST track all rule applications and decisions
+
+---
+
+# IMPLEMENTATION PRIORITY
+
+1. domain/legal/types.py
+2. domain/legal/operators.py
+3. domain/legal/rules.py
+4. domain/legal/precedence.py
+5. domain/legal/contradiction.py
+6. domain/legal/compiler_bindings.py
+7. domain/legal/equivalence_rules.py
+8. domain/legal/patterns.py
+9. domain/legal/examples.py
+10. domain/legal/tests.py
+
+---
+
+# END OF SPEC

@@ -1,0 +1,409 @@
+PROJECT: L-CDEA
+MODULE: trace/
+
+PURPOSE:
+Provide full deterministic observability for the complete L-CDEA pipeline.
+
+The trace logger records every major decision and transformation from:
+
+parse
+→ router
+→ planner
+→ compile
+→ canonicalize
+→ MECP
+→ execute
+→ discourse
+
+This module exists so failures, cache hits, operator choices, slot ordering, graph construction, and discourse updates are inspectable and reproducible.
+
+---
+
+# PIPELINE POSITION
+
+Input
+→ Parser
+→ Router
+→ Planner
+→ Compiler / Direct Graph
+→ CAS
+→ MECP
+→ Execution
+→ DiscourseState
+→ Trace Logger
+
+Trace Logger observes the pipeline.
+It MUST NOT affect pipeline behavior.
+
+---
+
+# DIRECTORY STRUCTURE
+
+l_cdea/trace/
+├── __init__.py
+├── event.py
+├── logger.py
+├── formatter.py
+├── sinks.py
+├── replay.py
+└── tests.py
+
+---
+
+# CORE TYPES
+
+TraceEvent {
+  event_id: str
+  stage: str
+  timestamp_index: int
+  payload: Dict
+}
+
+TraceRecord {
+  trace_id: str
+  input_text: str
+  events: Tuple[TraceEvent, ...]
+  final_status: str
+}
+
+TraceSink {
+  name: str
+  write(record: TraceRecord) -> None
+}
+
+---
+
+# STAGES TO TRACE
+
+Trace logger MUST support the following stage names:
+
+PARSE
+ROUTER
+PLANNER
+COMPILER
+CANONICALIZER
+MECP
+EXECUTION
+DISCOURSE
+ERROR
+
+---
+
+# REQUIRED TRACE PAYLOADS
+
+## 1. PARSE TRACE
+
+Must include:
+
+input_text
+tokens
+lexical_units
+presemantic_frames
+
+---
+
+## 2. ROUTER TRACE
+
+Must include:
+
+matched_patterns
+rejected_patterns
+selected_intent
+all_intents
+ambiguous
+fallback_used
+confidence_scores
+
+---
+
+## 3. PLANNER TRACE
+
+Must include:
+
+intent
+cache_checked
+cache_hit
+cache_keys_checked
+hydrated_slots
+arg_order
+slot_order_used
+retyped_slots
+operator_key
+operator_signature
+graph_built
+planning_errors
+
+Critical requirement:
+
+Planner trace MUST show that retype_slots_for_operator() and build_graph() used the same slot order source:
+
+slot_key_order(hydrated_slots, arg_order)
+
+---
+
+## 4. COMPILER TRACE
+
+Must include:
+
+compiled_graph_count
+interpretation_count
+binding_count
+strategy_count
+fallback_used
+
+---
+
+## 5. CANONICALIZER TRACE
+
+Must include:
+
+input_graph_count
+unique_signature_count
+equivalence_classes
+preserved_graph_count
+
+---
+
+## 6. MECP TRACE
+
+Must include:
+
+queue_order
+priority_map
+cost_map
+gain_map
+threshold
+selected_graph_count
+fallback_used
+
+---
+
+## 7. EXECUTION TRACE
+
+Must include:
+
+graph_order
+node_execution_order
+node_inputs
+node_outputs
+success_flags
+failures
+
+---
+
+## 8. DISCOURSE TRACE
+
+Must include:
+
+cache_write
+added_nodes
+added_edges
+reinforced_nodes
+temporal_events
+salience_updates
+
+---
+
+# HARD RULES
+
+1. Trace logger MUST be deterministic.
+2. Trace logger MUST NOT mutate pipeline state.
+3. Trace logger MUST NOT influence MECP, planner, router, compiler, execution, or discourse.
+4. Trace logger MUST preserve stage ordering.
+5. Trace logger MUST include enough data to replay or debug a result.
+6. Trace logger MUST record errors without crashing the system.
+7. Trace logger MUST not use random IDs unless seeded/deterministic.
+8. Trace logger MUST not call external services in V1.
+
+---
+
+# DETERMINISTIC ID RULE
+
+Trace IDs and event IDs MUST be deterministic in V1.
+
+Recommended format:
+
+trace_id =
+  stable hash of input_text + pipeline_version + discourse_snapshot_id
+
+event_id =
+  trace_id + stage + timestamp_index
+
+Do NOT use uuid4() in V1.
+
+---
+
+# SINKS
+
+V1 sinks:
+
+1. InMemoryTraceSink
+2. JSONLTraceSink
+
+Rules:
+
+InMemoryTraceSink:
+- stores trace records in memory for tests
+
+JSONLTraceSink:
+- writes one TraceRecord per line
+- append-only
+- deterministic serialization order
+
+---
+
+# FORMATTER
+
+formatter.py MUST provide:
+
+to_dict(record)
+to_json(record)
+to_pretty_text(record)
+
+Pretty output should be human-readable and include:
+
+- input
+- selected intent
+- cache hit/miss
+- selected operator
+- MECP selected graphs
+- execution output
+- discourse update
+
+---
+
+# REPLAY SUPPORT
+
+replay.py MUST provide minimal replay metadata.
+
+V1 replay does not need to re-run the full pipeline.
+
+It MUST allow inspection of:
+
+1. original input
+2. stage sequence
+3. selected intent
+4. selected operator
+5. selected execution graph
+6. final output
+
+---
+
+# ERROR HANDLING
+
+If any stage fails:
+
+Trace logger MUST record:
+
+stage
+error_type
+error_message
+payload_available
+
+Then final_status = "failed"
+
+If pipeline succeeds:
+
+final_status = "success"
+
+---
+
+# IMPLEMENTATION PRIORITY
+
+1. trace/event.py
+2. trace/sinks.py
+3. trace/logger.py
+4. trace/formatter.py
+5. trace/replay.py
+6. trace/__init__.py
+7. trace/tests.py
+8. integrate trace hooks into run pipeline / interface layer
+
+---
+
+# VALIDATION EXAMPLES
+
+## Example 1 — Router + Planner Trace
+
+Input:
+  "calculate acceleration from force 10 N and mass 2 kg"
+
+Expected trace includes:
+
+ROUTER:
+  selected_intent.domain = physics
+  selected_intent.operator_name = COMPUTE_ACCELERATION
+  arg_order = ("force", "mass")
+
+PLANNER:
+  hydrated_slots = {
+    force: {"value": 10, "unit": "N"},
+    mass: {"value": 2, "unit": "kg"}
+  }
+  slot_order_used = ("force", "mass")
+  retyped_slots use operator signature order
+  graph_built = true
+
+EXECUTION:
+  output = {"value": 5.0, "unit": "m/s²"}
+
+---
+
+## Example 2 — Cache Hit Trace
+
+Input repeated:
+  "capital of France"
+
+Expected trace includes:
+
+PLANNER:
+  cache_checked = true
+  cache_hit = true
+  graph_built = false
+
+EXECUTION:
+  skipped or not invoked
+
+DISCOURSE:
+  no duplicate semantic node created
+
+---
+
+## Example 3 — Fallback Trace
+
+Input:
+  "unknown phrase with no registered pattern"
+
+Expected trace includes:
+
+ROUTER:
+  fallback_used = true
+
+PLANNER:
+  fallback forwarded
+
+COMPILER:
+  fallback_used = true
+
+---
+
+# DESIGN INTENT
+
+Trace is the observability layer.
+
+It exists to answer:
+
+1. What did the system parse?
+2. Which domain/operator did it route to?
+3. Was the answer found in memory?
+4. How were slots hydrated and ordered?
+5. Which graph was built?
+6. What did MECP select?
+7. What executed?
+8. What entered DiscourseState?
+
+Trace MUST make the system debuggable without changing behavior.
+
+---
+
+# END OF SPEC

@@ -1,0 +1,284 @@
+PROJECT: L-CDEA
+MODULE: trace/relationship_provenance_display/
+
+PURPOSE:
+Surface provenance information for relationship-query results.
+
+Current behavior:
+  "what does force depend on"
+  → returns:
+      acceleration
+      mass
+      [no provenance]
+
+But the relationship edges already carry provenance internally.
+
+Desired behavior:
+  Relationship query output should show provenance for each returned relationship edge.
+
+Example:
+  force depends_on:
+  - acceleration
+    [source: mini_dictionary.txt | chunk: chunk_... | loc: line:2 | conf: 0.80]
+  - mass
+    [source: mini_dictionary.txt | chunk: chunk_... | loc: line:2 | conf: 0.80]
+
+---
+
+# POSITION IN PIPELINE
+
+Query
+→ Router
+→ Planner
+→ Relationship Lookup
+→ Provenance Extraction
+→ Output + Trace
+
+---
+
+# DIRECTORY IMPACT
+
+Patch existing modules:
+
+l_cdea/discourse/relationship_query/lookup.py
+l_cdea/discourse/relationship_query/trace.py
+l_cdea/trace/provenance_display/extractor.py
+l_cdea/trace/provenance_display/formatter.py
+l_cdea/run.py
+
+Optional tests:
+
+l_cdea/discourse/relationship_query/tests.py
+l_cdea/trace/provenance_display/tests.py
+
+---
+
+# CORE TYPES
+
+RelationshipResult {
+  target_value: str
+  relation_type: str
+  source_term: str
+  edge_id: Optional[str]
+  provenance: Tuple[Provenance, ...]
+}
+
+RelationshipQueryOutput {
+  source_term: str
+  relation_type: str
+  results: Tuple[RelationshipResult, ...]
+  fallback_used: bool
+}
+
+---
+
+# LOOKUP PATCH
+
+relationship_query/lookup.py MUST return provenance-aware results.
+
+Current likely behavior:
+  returns Tuple[str, ...]
+
+Required behavior:
+  returns RelationshipQueryOutput or equivalent structured result containing:
+
+1. source term
+2. relation type
+3. target values
+4. edge provenance entries
+
+Rules:
+1. Do not lose existing deterministic ordering.
+2. Sort results by:
+   - edge salience descending
+   - provenance confidence descending
+   - target value lexicographic
+3. Missing provenance is allowed but must display [no provenance].
+
+---
+
+# TRACE PATCH
+
+RelationshipQueryTrace MUST include per-edge provenance.
+
+Required fields:
+
+RelationshipQueryTrace {
+  term
+  normalized_term
+  relation_type
+  matched_source_node_id
+  matched_edges: Tuple[Dict, ...]
+  returned_values
+  hit
+  fallback_used
+}
+
+Each matched edge entry SHOULD include:
+
+{
+  source_node_id
+  target_node_id
+  target_value
+  relation_type
+  provenance_count
+  provenance_entries
+}
+
+---
+
+# PROVENANCE DISPLAY PATCH
+
+trace/provenance_display/extractor.py MUST support:
+
+extract_relationship_provenance(relationship_result)
+
+Returns:
+  Tuple[DisplayedProvenance, ...]
+
+Rules:
+1. Pull from RelationshipResult.provenance.
+2. Preserve confidence ordering.
+3. Deduplicate by trace_id.
+4. Limit display according to existing ProvenanceDisplayConfig.
+
+---
+
+# CLI OUTPUT PATCH
+
+Current output:
+
+[Entity] force depends_on:
+- acceleration
+- mass
+[no provenance]
+
+New output:
+
+[Entity] force depends_on:
+- acceleration
+  [source: mini_dictionary.txt | chunk: chunk_... | loc: line:2 | conf: 0.80]
+- mass
+  [source: mini_dictionary.txt | chunk: chunk_... | loc: line:2 | conf: 0.80]
+
+If one edge has no provenance:
+
+- acceleration
+  [no provenance]
+
+---
+
+# TRACE OUTPUT PATCH
+
+Add relationship provenance inside [PROVENANCE]:
+
+[PROVENANCE]
+  term: force
+  relation_type: depends_on
+  target: acceleration
+  - source: mini_dictionary.txt | chunk: chunk_... | loc: line:2 | conf: 0.8000
+
+  target: mass
+  - source: mini_dictionary.txt | chunk: chunk_... | loc: line:2 | conf: 0.8000
+
+---
+
+# HARD RULES
+
+1. Relationship provenance display MUST be deterministic.
+2. Display MUST NOT modify stored provenance.
+3. Display MUST NOT affect relationship lookup results.
+4. Display MUST preserve existing sorting.
+5. Missing provenance MUST degrade gracefully.
+6. Definition provenance display MUST continue to work.
+7. Relationship query behavior MUST remain unchanged except display/trace enrichment.
+8. No external services.
+9. No randomness.
+
+---
+
+# VALIDATION EXAMPLES
+
+Example 1 — force depends on mass and acceleration:
+
+Prior ingested:
+  "Force is mass times acceleration."
+
+Input:
+  "what does force depend on"
+
+Expected output:
+  force depends_on:
+  - acceleration
+    [source: ... | chunk: ... | loc: line:... | conf: ...]
+  - mass
+    [source: ... | chunk: ... | loc: line:... | conf: ...]
+
+---
+
+Example 2 — acceleration depends on velocity:
+
+Prior ingested:
+  "Acceleration is the rate of change of velocity."
+
+Input:
+  "what does acceleration depend on"
+
+Expected output:
+  acceleration depends_on:
+  - velocity
+    [source: ... | chunk: ... | loc: line:... | conf: ...]
+
+---
+
+Example 3 — no relationship found:
+
+Input:
+  "what does entropy depend on"
+
+Expected:
+  relationships_of(entropy, depends_on)
+  [no provenance]
+
+---
+
+Example 4 — regression:
+
+Input:
+  "what is force"
+
+Expected:
+  definition provenance display unchanged.
+
+---
+
+# IMPLEMENTATION PRIORITY
+
+1. Patch relationship_query lookup return structure.
+2. Patch RelationshipQueryTrace.
+3. Add relationship provenance extractor.
+4. Patch provenance formatter if needed.
+5. Patch run.py relationship output display.
+6. Add tests for relationship provenance display.
+7. Run definition provenance regression tests.
+8. Run CLI validation examples.
+
+---
+
+# SUCCESS CRITERIA
+
+After patch:
+
+python3 -m l_cdea.run "what does force depend on" --trace
+
+Expected:
+  acceleration and mass each show provenance.
+
+python3 -m l_cdea.run "what is force" --trace
+
+Expected:
+  definition provenance still works.
+
+---
+
+# END OF SPEC

@@ -1,0 +1,287 @@
+PROJECT: L-CDEA
+MODULE: ingestion/chunking/
+
+PURPOSE:
+Fix dictionary-mode chunking so each valid dictionary/glossary entry becomes its own independently traceable chunk.
+
+Current behavior:
+  mini_dictionary.txt contains 4 definitions.
+  ingest_document(..., mode="dictionary") reports:
+    chunks_processed = 1
+    definitions = 4
+    nodes_added = 4
+
+This means the whole file is treated as one chunk, while extractors split multiple definitions internally.
+
+This works functionally, but weakens provenance because multiple definitions share one chunk context.
+
+Desired behavior:
+  In dictionary mode, each valid definition line should become its own chunk.
+
+Example input:
+  Velocity is displacement over time.
+  Force is mass times acceleration.
+  Acceleration is the rate of change of velocity.
+  Mass is the amount of matter in an object.
+
+Expected:
+  chunks_processed = 4
+  definitions = 4
+  nodes_added = 4
+
+Each definition should have its own stable chunk_id.
+
+---
+
+# POSITION IN PIPELINE
+
+Document Input
+→ Mode-aware Chunker
+→ Ingestion Router
+→ Extractors
+→ Provenance
+→ Validation
+→ DiscourseState
+→ Persistence
+
+---
+
+# DIRECTORY IMPACT
+
+Patch existing:
+
+l_cdea/ingestion/chunker.py
+l_cdea/ingestion/knowledge_importer.py
+l_cdea/ingestion/modes/tests.py
+
+Optional:
+
+l_cdea/ingestion/chunk_ids.py
+
+---
+
+# DICTIONARY MODE CHUNKING RULE
+
+If mode == "dictionary":
+
+1. Split document by lines.
+2. Trim whitespace.
+3. Reject empty lines.
+4. Validate each line with is_valid_dictionary_chunk().
+5. Each valid line becomes exactly one chunk.
+6. Each chunk receives a stable chunk_id.
+
+Do NOT merge lines in dictionary mode.
+
+---
+
+# DOCUMENT MODE RULE
+
+If mode == "document":
+
+Keep current behavior:
+- paragraph/block-based chunking
+- MIN_CHUNK_CHARS = 40
+- short-fragment filtering
+
+Dictionary-mode changes MUST NOT weaken document-mode behavior.
+
+---
+
+# STABLE CHUNK ID RULE
+
+Each dictionary chunk MUST have deterministic ID:
+
+chunk_id =
+  stable_hash(source_path + mode + line_number + normalized_line_text)
+
+Example:
+
+chunk_001_velocity_is_displacement...
+
+or hash-based:
+
+chunk_9f82a1c3
+
+Rules:
+1. Same file + same line text + same line number → same chunk_id.
+2. No uuid4().
+3. No wall-clock timestamps.
+4. chunk_id must be saved in provenance.
+
+---
+
+# PROVENANCE REQUIREMENT
+
+Each definition node created from dictionary mode MUST include:
+
+Provenance {
+  source_path
+  chunk_id
+  location = "line:<line_number>"
+  extraction_method = "definition_extractor"
+  confidence
+  trace_id
+  timestamp_index
+}
+
+Metadata must include:
+
+metadata {
+  category: "definition"
+  term: normalized_term
+  definition_text: original_line_text
+  ingestion_mode: "dictionary"
+  chunk_id: stable_chunk_id
+}
+
+---
+
+# TRACE REQUIREMENTS
+
+IngestionModeTrace should report:
+
+mode = dictionary
+accepted_chunks = number of valid dictionary lines
+rejected_chunks = number of invalid lines
+min_chunk_chars = 5
+
+Optional detailed trace:
+
+DictionaryChunkTrace {
+  line_number
+  text
+  accepted
+  reason
+  chunk_id
+}
+
+---
+
+# VALIDATION EXAMPLES
+
+Example 1 — four valid definitions:
+
+Input:
+  Velocity is displacement over time.
+  Force is mass times acceleration.
+  Acceleration is the rate of change of velocity.
+  Mass is the amount of matter in an object.
+
+Expected:
+  chunks_processed = 4
+  definitions = 4
+  nodes_added = 4
+  each node has unique chunk_id
+
+---
+
+Example 2 — invalid short fragment:
+
+Input:
+  Velocity
+  Force is mass times acceleration.
+
+Expected:
+  chunks_processed = 1
+  rejected_chunks = 1
+  definitions = 1
+
+---
+
+Example 3 — blank lines:
+
+Input:
+  Velocity is displacement over time.
+
+  Force is mass times acceleration.
+
+Expected:
+  blank lines ignored
+  chunks_processed = 2
+
+---
+
+Example 4 — document mode unchanged:
+
+Input:
+  Velocity is displacement over time.
+
+mode = document
+
+Expected:
+  rejected or ignored if below MIN_CHUNK_CHARS = 40
+
+---
+
+# HARD RULES
+
+1. Dictionary mode MUST chunk line-by-line.
+2. Document mode MUST remain unchanged.
+3. Each valid dictionary line MUST get a unique stable chunk_id.
+4. Provenance MUST include chunk_id and line location.
+5. Chunking MUST be deterministic.
+6. No random IDs.
+7. No external services.
+8. Invalid dictionary fragments MUST be rejected.
+9. Extractors MUST NOT be responsible for splitting multiple dictionary entries from one chunk in dictionary mode.
+10. Existing definition retrieval behavior MUST continue to pass.
+
+---
+
+# IMPLEMENTATION PRIORITY
+
+1. Patch ingestion/chunker.py for dictionary line-level chunking.
+2. Add stable chunk_id generation helper.
+3. Patch knowledge_importer.py to pass chunk_id/location into provenance.
+4. Patch metadata creation to include chunk_id.
+5. Add tests:
+   - 4 definitions → 4 chunks
+   - invalid fragment rejected
+   - blank lines ignored
+   - document mode unchanged
+   - chunk IDs stable across runs
+6. Re-run dictionary ingestion test.
+7. Re-run definition retrieval test.
+
+---
+
+# SUCCESS CRITERIA
+
+After patch:
+
+Command:
+
+python3 - <<'PY'
+from l_cdea.ingestion import ingest_document
+
+result = ingest_document(
+    "/home/nestor/Desktop/Lamina/knowledge_seed/mini_dictionary.txt",
+    mode="dictionary"
+)
+print(result)
+PY
+
+Expected:
+
+chunks_processed=4
+definitions=4
+items_registered=8
+nodes_added=4
+
+Then:
+
+python3 -m l_cdea.run "what is velocity" --trace
+
+Expected:
+
+output:
+  Velocity is displacement over time.
+
+Trace/provenance:
+  chunk_id present
+  location = line:1
+
+---
+
+# END OF SPEC

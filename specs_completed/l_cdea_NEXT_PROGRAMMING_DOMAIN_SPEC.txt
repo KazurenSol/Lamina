@@ -1,0 +1,344 @@
+PROJECT: L-CDEA
+MODULE: domain/programming/
+
+PURPOSE:
+Provide a high-stress domain pack for code reasoning, structured program representation, and executable semantic transformation.
+
+---
+
+# DOMAIN ROLE
+
+Programming Domain V1 is used to test and extend:
+
+1. CDL operator composition
+2. CAS equivalence detection
+3. MECP pruning quality
+4. Execution correctness
+5. DiscourseState memory reuse
+6. Future operator discovery
+
+This domain is NOT the general execution engine. It is a domain layer that maps programming concepts into CDL-compatible typed operator graphs.
+
+---
+
+# DIRECTORY STRUCTURE
+
+l_cdea/domain/programming/
+├── __init__.py
+├── operators.py
+├── types.py
+├── patterns.py
+├── compiler_bindings.py
+├── equivalence_rules.py
+├── examples.py
+└── tests.py
+
+---
+
+# PROGRAMMING DOMAIN TYPES
+
+Programming domain types MUST map back to core semantic types.
+
+Program
+  maps_to: Process
+
+Function
+  maps_to: Process
+
+Variable
+  maps_to: Entity
+
+Value
+  maps_to: Entity
+
+Collection
+  maps_to: Entity
+
+Expression
+  maps_to: Process
+
+Statement
+  maps_to: Event
+
+Condition
+  maps_to: Constraint
+
+Loop
+  maps_to: Process
+
+Branch
+  maps_to: Process
+
+ReturnValue
+  maps_to: State
+
+Error
+  maps_to: State
+
+---
+
+# PROGRAMMING OPERATORS V1
+
+DEFINE_VARIABLE(name, value) -> Variable
+
+ASSIGN(variable, value) -> State
+
+DEFINE_FUNCTION(name, parameters, body) -> Function
+
+CALL_FUNCTION(function, arguments) -> Value
+
+RETURN_VALUE(value) -> ReturnValue
+
+EVALUATE_EXPRESSION(expression) -> Value
+
+CONDITIONAL_BRANCH(condition, true_path, false_path) -> Branch
+
+ITERATE(collection, operation) -> Process
+
+INDEX(collection, position) -> Value
+
+APPEND(collection, value) -> Collection
+
+REMOVE(collection, value) -> Collection
+
+LOOKUP_KEY(mapping, key) -> Value
+
+SET_KEY(mapping, key, value) -> State
+
+COMPARE_VALUES(left, right, comparator) -> Constraint
+
+RAISE_ERROR(error_type, message) -> Error
+
+HANDLE_ERROR(error, handler) -> State
+
+---
+
+# REQUIRED CORE OPERATOR MAPPINGS
+
+Programming operators MUST reduce to existing core operators where possible.
+
+DEFINE_VARIABLE
+= DEFINE(Entity)
+
+ASSIGN
+= TRANSFORM(State)
+
+CALL_FUNCTION
+= EXECUTE(Process)
+
+RETURN_VALUE
+= RETURN(Entity)
+
+ITERATE
+= MAP or REDUCE depending on body
+
+CONDITIONAL_BRANCH
+= SELECT(path) under Constraint
+
+LOOKUP_KEY
+= LOOKUP(key, mapping)
+
+APPEND
+= TRANSFORM(collection)
+
+REMOVE
+= FILTER(collection, value != target)
+
+COMPARE_VALUES
+= COMPARE(left, right)
+
+---
+
+# CANONICALIZATION RULES
+
+CAS MUST recognize equivalent programming structures.
+
+Examples:
+
+x = x + 1
+is equivalent to:
+x += 1
+
+return f(x)
+is equivalent to:
+result = f(x)
+return result
+ONLY if result has no other use.
+
+for item in collection:
+    output.append(f(item))
+is equivalent to:
+MAP(collection, f)
+ONLY if loop body has no side effects.
+
+if condition:
+    return A
+else:
+    return B
+is equivalent to:
+RETURN_VALUE(SELECT(condition, A, B))
+
+---
+
+# MECP STRESS CASES
+
+Programming domain MUST expose cases where MECP must choose efficient paths.
+
+Example 1:
+Task:
+  "Find the first even number in this list."
+
+Possible graphs:
+  G1: FILTER all evens, then INDEX first
+  G2: ITERATE until first match, then RETURN
+  G3: SORT then search
+
+Expected MECP preference:
+  G2 because it minimizes unnecessary work.
+
+Example 2:
+Task:
+  "Reverse a list."
+
+Possible graphs:
+  G1: use reverse operator if available
+  G2: iterate backward and append
+  G3: recursively split and merge
+
+Expected MECP preference:
+  G1 if operator exists, otherwise G2.
+
+Example 3:
+Task:
+  "Look up the capital of Texas in a mapping."
+
+Possible graphs:
+  G1: LOOKUP_KEY(mapping, Texas)
+  G2: ITERATE all pairs until key == Texas
+  G3: FILTER mapping then return first
+
+Expected MECP preference:
+  G1.
+
+---
+
+# EXECUTION RULES
+
+Programming domain operators MUST be deterministic.
+
+No hidden randomness.
+No environment mutation unless operator explicitly declares mutation.
+No filesystem/network access in V1.
+No code execution outside L-CDEA runtime in V1.
+
+---
+
+# DISCOURSESTATE STORAGE RULES
+
+Executed programming structures MAY be stored as reusable semantic patterns.
+
+Examples:
+
+Pattern:
+  LOOKUP_KEY(mapping, key)
+
+Can be reused for:
+  dictionary lookup
+  table lookup
+  state-capital lookup
+  config lookup
+
+Pattern:
+  ITERATE(collection, operation)
+
+Can be reused for:
+  loops
+  maps
+  reductions
+  searches
+
+---
+
+# OPERATOR DISCOVERY RULES
+
+The system MAY propose new programming operators if a repeated graph pattern appears.
+
+Example candidate:
+
+FIND_FIRST(collection, predicate)
+=
+ITERATE(collection, IF predicate(item) THEN RETURN item)
+
+Registration requirements:
+1. Valid TypeSignature
+2. Deterministic
+3. No duplicate existing operator
+4. Reduces graph complexity
+5. Improves MECP efficiency
+6. Versioned
+7. Passes tests
+
+Candidate operators MUST NOT be auto-registered.
+
+---
+
+# INITIAL VALIDATION EXAMPLES
+
+Example 1:
+Input:
+  "Create a function that returns the square of a number."
+
+Expected graph:
+  DEFINE_FUNCTION(square, [x], RETURN_VALUE(x * x))
+
+Example 2:
+Input:
+  "Get the capital of Texas from the state capital dictionary."
+
+Expected graph:
+  LOOKUP_KEY(state_capital_dictionary, Texas)
+
+Example 3:
+Input:
+  "Return all numbers greater than 10."
+
+Expected graph:
+  FILTER(numbers, n > 10)
+  RETURN_VALUE(filtered_numbers)
+
+Example 4:
+Input:
+  "Find the first item matching the condition."
+
+Expected graph:
+  ITERATE(collection, condition_check)
+  RETURN_VALUE(first_match)
+
+---
+
+# HARD RULES
+
+1. Programming domain MUST NOT modify CDL core semantics.
+2. Programming domain MUST map all domain operators to core semantic types.
+3. Programming domain MUST remain deterministic.
+4. Programming domain MUST not bypass CAS.
+5. Programming domain MUST not bypass MECP.
+6. Programming domain MUST not execute arbitrary external code.
+7. Programming domain MAY propose operators but MUST NOT auto-register them.
+8. Programming domain MUST provide examples for testing CAS and MECP.
+
+---
+
+# IMPLEMENTATION PRIORITY
+
+1. domain/programming/types.py
+2. domain/programming/operators.py
+3. domain/programming/compiler_bindings.py
+4. domain/programming/equivalence_rules.py
+5. domain/programming/patterns.py
+6. domain/programming/examples.py
+7. domain/programming/tests.py
+
+---
+
+# END OF SPEC

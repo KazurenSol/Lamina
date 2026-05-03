@@ -1,0 +1,39 @@
+PROJECT: L-CDEA
+MODULE: domain/geography/
+
+PURPOSE:
+Provide initial domain operator pack for testing and demonstration.
+
+---
+
+# GEOGRAPHY DOMAIN V1
+
+OPERATORS = {
+
+  LOCATED_IN,
+  CAPITAL_OF,
+  STATE_OF,
+  COUNTRY_OF,
+  BORDER_WITH,
+  POPULATION_OF
+}
+
+---
+
+# RULES
+
+1. Domain operators MUST map to core operator compositions
+2. Domain operators MUST be deterministic
+3. Domain operators MUST NOT duplicate core operators
+4. Domain operators MUST be validated against real data
+
+---
+
+# EXAMPLE
+
+CAPITAL_OF(state)
+= LOOKUP(state, state_capital_mapping)
+
+---
+
+END OF SPEC

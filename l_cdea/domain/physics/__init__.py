@@ -1,0 +1,3 @@
+from .operators import register_physics_operators, register_governed_operators
+register_physics_operators()
+register_governed_operators()

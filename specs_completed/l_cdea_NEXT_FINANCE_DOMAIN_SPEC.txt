@@ -1,0 +1,331 @@
+PROJECT: L-CDEA
+MODULE: domain/finance/
+
+PURPOSE:
+Provide a high-stress domain pack for modeling financial systems, transactions, time-dependent value, and risk/return tradeoffs.
+
+---
+
+# DOMAIN ROLE
+
+Finance Domain V1 is designed to stress:
+
+1. Time-dependent transformations (interest, growth, decay)
+2. Numerical + logical reasoning combined
+3. MECP tradeoff decisions (risk vs return vs cost)
+4. DiscourseState accumulation of transactional history
+5. Multi-step computation pipelines
+6. Integration with math + programming domains
+
+This domain introduces **temporal reasoning + accumulation**, which is critical for real-world applications.
+
+---
+
+# DIRECTORY STRUCTURE
+
+l_cdea/domain/finance/
+├── __init__.py
+├── operators.py
+├── types.py
+├── time.py
+├── transactions.py
+├── risk.py
+├── equivalence_rules.py
+├── compiler_bindings.py
+├── patterns.py
+├── examples.py
+└── tests.py
+
+---
+
+# FINANCE DOMAIN TYPES (mapped to core)
+
+Money
+  maps_to: Entity
+
+Account
+  maps_to: Entity
+
+Transaction
+  maps_to: Event
+
+Balance
+  maps_to: State
+
+Rate (interest rate)
+  maps_to: Constraint
+
+Time
+  maps_to: Entity
+
+Investment
+  maps_to: Process
+
+Return
+  maps_to: State
+
+Risk
+  maps_to: Constraint
+
+Asset
+  maps_to: Entity
+
+Liability
+  maps_to: Entity
+
+Portfolio
+  maps_to: Entity
+
+CashFlow
+  maps_to: Event
+
+---
+
+# FINANCE OPERATORS V1
+
+# Core transactions
+
+DEPOSIT(account, amount) -> Balance
+WITHDRAW(account, amount) -> Balance
+TRANSFER(source, target, amount) -> Balance
+
+# Value computation
+
+COMPUTE_INTEREST(principal, rate, time) -> Money
+COMPUTE_COMPOUND_INTEREST(principal, rate, time, frequency) -> Money
+UPDATE_BALANCE(account, transaction) -> Balance
+
+# Investment
+
+INVEST(asset, amount) -> Investment
+CALCULATE_RETURN(investment, time) -> Return
+EVALUATE_RISK(asset) -> Risk
+
+# Portfolio
+
+ADD_ASSET(portfolio, asset) -> Portfolio
+REMOVE_ASSET(portfolio, asset) -> Portfolio
+COMPUTE_PORTFOLIO_VALUE(portfolio) -> Money
+
+# Time operations
+
+ADVANCE_TIME(state, time_delta) -> State
+
+# Comparison
+
+COMPARE_VALUES(value1, value2) -> Constraint
+
+---
+
+# REQUIRED CORE OPERATOR MAPPINGS
+
+DEPOSIT
+= TRANSFORM(balance + amount)
+
+WITHDRAW
+= TRANSFORM(balance - amount)
+
+TRANSFER
+= TRANSFORM(source - amount, target + amount)
+
+COMPUTE_INTEREST
+= TRANSFORM(principal * rate * time)
+
+COMPUTE_COMPOUND_INTEREST
+= TRANSFORM(principal * (1 + rate)^time)
+
+CALCULATE_RETURN
+= TRANSFORM(final_value - initial_value)
+
+EVALUATE_RISK
+= CLASSIFY(asset risk level)
+
+---
+
+# TEMPORAL RULES
+
+Finance requires explicit time modeling.
+
+RULES:
+
+1. All growth/decay MUST include time input
+2. No implicit time progression
+3. Time must be tracked in DiscourseState
+4. MECP may favor faster analytical solutions over simulation
+
+---
+
+# CANONICALIZATION RULES
+
+CAS MUST detect equivalent financial expressions.
+
+Examples:
+
+Simple interest:
+  A = P * (1 + r * t)
+
+Compound interest:
+  A = P * (1 + r)^t
+
+Equivalent representations MUST normalize when mathematically identical.
+
+Transaction sequences that result in same balance MUST be equivalent.
+
+---
+
+# MECP STRESS CASES
+
+Example 1:
+Task:
+  "Compute compound interest"
+
+Possible graphs:
+  G1: direct formula
+  G2: iterative accumulation loop
+  G3: simulation over time steps
+
+Expected MECP preference:
+  G1
+
+---
+
+Example 2:
+Task:
+  "Find best investment"
+
+Possible graphs:
+  G1: compare returns
+  G2: simulate portfolio growth
+  G3: risk-adjusted evaluation
+
+Expected MECP preference:
+  G3 if risk included, otherwise G1
+
+---
+
+Example 3:
+Task:
+  "Track account balance over time"
+
+Possible graphs:
+  G1: apply transactions sequentially
+  G2: aggregate then compute
+  G3: simulate time steps
+
+Expected MECP preference:
+  G1
+
+---
+
+# EXECUTION RULES
+
+1. All finance operators MUST be deterministic
+2. No randomness in V1
+3. No external financial APIs in V1
+4. All computations MUST be reproducible
+
+---
+
+# DISCOURSESTATE STORAGE RULES
+
+Finance memory should track:
+
+- accounts and balances
+- transaction history
+- investments
+- time evolution of value
+
+Example:
+
+Account:
+  balance = 1000
+
+Transaction:
+  deposit 200
+
+Result:
+  balance = 1200
+
+---
+
+# OPERATOR DISCOVERY RULES
+
+System MAY propose new operators:
+
+Example:
+
+NET_PRESENT_VALUE(cashflows, discount_rate)
+=
+series of discounted sums
+
+Must meet validation requirements before registration.
+
+---
+
+# INITIAL VALIDATION EXAMPLES
+
+Example 1:
+Input:
+  "Deposit 100 into account"
+
+Expected graph:
+  DEPOSIT(account, 100)
+
+---
+
+Example 2:
+Input:
+  "Compute compound interest"
+
+Expected graph:
+  COMPUTE_COMPOUND_INTEREST(principal, rate, time)
+
+---
+
+Example 3:
+Input:
+  "What is the return on this investment?"
+
+Expected graph:
+  CALCULATE_RETURN(investment)
+
+---
+
+Example 4:
+Input:
+  "Compare two investments"
+
+Expected graph:
+  COMPARE_VALUES(return1, return2)
+
+---
+
+# HARD RULES
+
+1. Finance domain MUST NOT alter CDL semantics
+2. Finance domain MUST enforce time-dependence
+3. Finance domain MUST remain deterministic
+4. Finance domain MUST not bypass CAS
+5. Finance domain MUST not bypass MECP
+6. Finance domain MUST not use stochastic models in V1
+7. Finance domain MAY propose operators but MUST NOT auto-register
+8. Finance domain MUST track all state changes explicitly
+
+---
+
+# IMPLEMENTATION PRIORITY
+
+1. domain/finance/types.py
+2. domain/finance/operators.py
+3. domain/finance/time.py
+4. domain/finance/transactions.py
+5. domain/finance/risk.py
+6. domain/finance/compiler_bindings.py
+7. domain/finance/equivalence_rules.py
+8. domain/finance/patterns.py
+9. domain/finance/examples.py
+10. domain/finance/tests.py
+
+---
+
+# END OF SPEC

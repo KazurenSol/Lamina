@@ -1,0 +1,286 @@
+PROJECT: L-CDEA
+MODULE: ingestion/validation/
+
+PURPOSE:
+Validate all extracted knowledge before it enters DiscourseState.
+
+Prevents:
+- incorrect facts entering memory
+- duplicate knowledge
+- silent contradictions
+- low-quality or malformed extractions
+
+This module is the gatekeeper between extraction and memory.
+
+---
+
+# POSITION IN PIPELINE
+
+Document Input
+→ Chunking
+→ Ingestion Router
+→ Extractors
+→ Provenance Attachment
+→ Knowledge Validation (THIS MODULE)
+→ DiscourseState
+→ Persistence
+
+---
+
+# DIRECTORY STRUCTURE
+
+l_cdea/ingestion/validation/
+├── __init__.py
+├── validate.py
+├── duplicate.py
+├── conflict.py
+├── scoring.py
+├── rules.py
+├── trace.py
+└── tests.py
+
+---
+
+# CORE TYPES
+
+ValidationDecision {
+  status: str  # "accept" | "reject" | "merge" | "conflict"
+  reason: str
+  score: float
+  duplicate_of: Optional[str]
+  conflict_with: Optional[str]
+}
+
+ValidatedKnowledge {
+  value: ProvenancedValue
+  decision: ValidationDecision
+}
+
+ValidationTrace {
+  input_value
+  duplicate_check
+  conflict_check
+  score
+  decision
+}
+
+---
+
+# VALIDATION FLOW
+
+validate(value, discourse_state):
+
+1. run duplicate detection
+2. run conflict detection
+3. compute quality score
+4. apply rule set
+5. return ValidationDecision
+
+No mutation happens here.
+DiscourseState update happens only after ACCEPT or MERGE.
+
+---
+
+# DUPLICATE DETECTION
+
+duplicate.py:
+
+detect_duplicate(value, discourse_state):
+
+Rules:
+1. Exact match:
+   same semantic value → duplicate
+2. Canonical match:
+   same canonical signature → duplicate
+3. Dataset match:
+   same dataset-derived value → duplicate
+
+Output:
+  duplicate_of = node_id if found
+
+---
+
+# CONFLICT DETECTION
+
+conflict.py:
+
+detect_conflict(value, discourse_state):
+
+Rules:
+1. Same key, different value:
+   CAPITAL_OF(France) = Paris vs Lyon
+2. Contradictory relations:
+   X causes Y vs X does not cause Y
+3. Inverse mismatch:
+   A contains B vs A does not contain B
+
+Output:
+  conflict_with = node_id if found
+
+---
+
+# SCORING
+
+scoring.py:
+
+compute_score(value):
+
+Factors:
+1. provenance confidence
+2. source_type weight:
+   dataset > execution > document
+3. extraction_method reliability
+4. structural completeness
+
+Score range:
+  0.0–1.0
+
+---
+
+# RULE SET
+
+rules.py:
+
+apply_rules(value, duplicate, conflict, score):
+
+Decision logic:
+
+1. If conflict:
+   status = "conflict"
+2. Else if duplicate:
+   status = "merge"
+3. Else if score < threshold (e.g. 0.5):
+   status = "reject"
+4. Else:
+   status = "accept"
+
+Rules MUST be deterministic.
+
+---
+
+# MERGE BEHAVIOR
+
+If status == "merge":
+
+1. Do not create new node
+2. Merge provenance into existing node
+3. Reinforce salience
+
+---
+
+# CONFLICT BEHAVIOR
+
+If status == "conflict":
+
+1. Do not overwrite existing node
+2. Record conflict in trace
+3. Optionally store as conflicting candidate (future extension)
+
+---
+
+# REJECTION BEHAVIOR
+
+If status == "reject":
+
+1. Do not store value
+2. Record rejection reason
+
+---
+
+# TRACE REQUIREMENTS
+
+trace.py:
+
+ValidationTrace MUST include:
+
+value
+duplicate_of
+conflict_with
+score
+decision
+reason
+
+---
+
+# HARD RULES
+
+1. No value may enter DiscourseState without validation.
+2. Validation MUST be deterministic.
+3. Duplicate knowledge MUST NOT create new nodes.
+4. Conflicting knowledge MUST NOT overwrite existing nodes.
+5. Low-quality knowledge MUST be rejected.
+6. Provenance MUST be considered in scoring.
+7. Validation MUST NOT mutate DiscourseState.
+8. Validation MUST be trace-visible.
+
+---
+
+# VALIDATION EXAMPLES
+
+Example 1 — accept:
+
+Input:
+  "Acceleration is rate of change of velocity."
+
+Expected:
+  status = accept
+
+---
+
+Example 2 — duplicate:
+
+Existing:
+  Paris
+
+New:
+  Paris
+
+Expected:
+  status = merge
+
+---
+
+Example 3 — conflict:
+
+Existing:
+  CAPITAL_OF(France) = Paris
+
+New:
+  CAPITAL_OF(France) = Lyon
+
+Expected:
+  status = conflict
+
+---
+
+Example 4 — reject:
+
+Input:
+  malformed extraction with low confidence
+
+Expected:
+  status = reject
+
+---
+
+# IMPLEMENTATION PRIORITY
+
+1. ingestion/validation/validate.py
+2. ingestion/validation/duplicate.py
+3. ingestion/validation/conflict.py
+4. ingestion/validation/scoring.py
+5. ingestion/validation/rules.py
+6. ingestion/validation/trace.py
+7. ingestion/validation/tests.py
+
+---
+
+# DESIGN INTENT
+
+Not all extracted knowledge is correct or useful.
+
+This module ensures only high-quality, consistent knowledge enters memory.
+
+---
+
+# END OF SPEC

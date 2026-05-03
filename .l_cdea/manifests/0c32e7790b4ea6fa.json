@@ -1,0 +1,17 @@
+{
+  "book_id": "0c32e7790b4ea6fa",
+  "chapters_completed": 1,
+  "chapters_total": 3,
+  "chunks_processed": 1,
+  "chunks_total": 0,
+  "edges_added": 2,
+  "last_checkpoint": {
+    "book_id": "0c32e7790b4ea6fa",
+    "chapter_id": "chap_1d3b1d21b17d",
+    "chunk_index": 1,
+    "timestamp": 1
+  },
+  "nodes_added": 1,
+  "source_path": "/tmp/lamina_test/physics_book.txt",
+  "status": "in_progress"
+}

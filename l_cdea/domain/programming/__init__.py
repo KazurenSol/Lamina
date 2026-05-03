@@ -1,0 +1,3 @@
+from .operators import register_programming_operators, register_governed_operators
+register_programming_operators()
+register_governed_operators()

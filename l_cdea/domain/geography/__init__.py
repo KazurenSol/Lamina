@@ -1,0 +1,3 @@
+from .operators import register_geography_operators, register_governed_operators
+register_geography_operators()
+register_governed_operators()

@@ -1,0 +1,60 @@
+PROJECT: L-CDEA
+MODULE: ingestion/
+
+PURPOSE:
+Convert books/documents into structured semantic graphs with provenance.
+
+---
+
+# DIRECTORY STRUCTURE
+
+l_cdea/ingestion/
+├── document_loader.py
+├── chunker.py
+├── claim_extractor.py
+├── definition_extractor.py
+├── procedure_extractor.py
+├── source_tracker.py
+├── contradiction_checker.py
+└── knowledge_importer.py
+
+---
+
+# PIPELINE
+
+Document
+→ Load
+→ Chunk
+→ Extract (claims, definitions, procedures)
+→ Compile to CDL graphs
+→ CAS
+→ MECP
+→ Validate
+→ Import into DiscourseState
+
+---
+
+# PROVENANCE STRUCTURE
+
+KnowledgeItem {
+  content_graph
+  source_title
+  source_author
+  page
+  paragraph
+  confidence
+  extraction_method
+}
+
+---
+
+# HARD RULES
+
+1. MUST NOT modify CDL
+2. MUST preserve provenance
+3. MUST validate contradictions
+4. MUST not auto-create operators
+
+---
+
+END OF SPEC

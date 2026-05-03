@@ -1,0 +1,417 @@
+PROJECT: L-CDEA
+MODULE: core/router/
+
+PURPOSE:
+Provide a deterministic query-routing layer between parser output and compiler input.
+
+The router converts generic ParsedInput frames into typed IntentFrame objects that identify:
+1. target domain
+2. target operator
+3. extracted slot bindings
+4. routing confidence
+5. fallback status
+
+This solves the current gap:
+
+ParsedInput:
+  generic token/frame output
+
+Router:
+  identifies domain/operator intent
+
+Compiler:
+  receives IntentFrame and builds CDL graph directly
+
+---
+
+# POSITION IN PIPELINE
+
+Input
+→ Parser
+→ Router
+→ Compiler
+→ CAS
+→ MECP
+→ Execution
+→ DiscourseState
+→ Trace Logger
+
+---
+
+# DIRECTORY STRUCTURE
+
+l_cdea/core/router/
+├── __init__.py
+├── intent.py
+├── patterns.py
+├── dispatcher.py
+├── slot_filler.py
+└── tests.py
+
+---
+
+# ROUTER TYPES
+
+IntentFrame {
+  domain: str
+  operator_name: str
+  slots: Dict[str, str]
+  confidence: float
+  source_pattern_id: str
+  fallback: bool
+}
+
+PatternRule {
+  id: str
+  domain: str
+  operator_name: str
+  keywords: Tuple[str, ...]
+  required_slots: Tuple[str, ...]
+  optional_slots: Tuple[str, ...]
+  priority: int
+}
+
+RouteResult {
+  intents: Tuple[IntentFrame, ...]
+  selected_intent: IntentFrame
+  ambiguous: bool
+  fallback_used: bool
+}
+
+---
+
+# REQUIRED CORE MAPPINGS
+
+The router MUST map:
+
+ParsedInput
+→ PatternRule matching
+→ slot extraction
+→ IntentFrame
+→ compiler-ready semantic intent
+
+Example:
+
+Input:
+  "capital of France"
+
+Parser:
+  tokens = ["capital", "of", "France"]
+
+Router:
+  matches geography pattern:
+    domain = "geography"
+    operator_name = "CAPITAL_OF"
+    slots = { "region": "France" }
+
+Output:
+  IntentFrame(
+    domain="geography",
+    operator_name="CAPITAL_OF",
+    slots={"region": "France"},
+    confidence=deterministic_score,
+    fallback=False
+  )
+
+---
+
+# PATTERN REGISTRATION MODEL
+
+Patterns are registered per domain.
+
+Each domain MAY expose:
+
+domain/<name>/compiler_bindings.py
+
+with:
+
+register_patterns(registry)
+
+Example:
+
+geography/compiler_bindings.py registers:
+
+PatternRule(
+  id="geo.capital_of.region",
+  domain="geography",
+  operator_name="CAPITAL_OF",
+  keywords=("capital", "of"),
+  required_slots=("region",),
+  optional_slots=(),
+  priority=100
+)
+
+---
+
+# MATCHING RULES
+
+The router MUST use deterministic pattern matching.
+
+A pattern matches if:
+
+1. required keywords are present
+2. required slots can be extracted
+3. domain/operator exists or is declared in domain bindings
+
+No probabilistic language model calls.
+No external API calls.
+No runtime operator creation.
+
+---
+
+# CONFIDENCE SCORING
+
+Confidence is deterministic and structural.
+
+Suggested model:
+
+confidence =
+  keyword_match_score
++ slot_fill_score
++ priority_bonus
+- ambiguity_penalty
+
+Rules:
+1. Same input always produces same confidence.
+2. Confidence MUST NOT use randomness.
+3. Confidence MUST NOT modify meaning.
+4. Confidence is used only for routing selection.
+
+---
+
+# AMBIGUITY HANDLING
+
+If multiple domains match:
+
+Example:
+  "classify this case"
+
+Could match:
+  legal.CLASSIFY_CASE
+  programming.CLASSIFY_OBJECT
+  generic.CLASSIFY
+
+Router MUST:
+
+1. return all matching IntentFrames
+2. mark ambiguous=True
+3. select highest-confidence deterministic candidate
+4. preserve alternatives in RouteResult
+
+Tie-breaking order:
+
+1. higher confidence
+2. higher pattern priority
+3. lexicographic domain name
+4. lexicographic operator name
+5. lexicographic pattern id
+
+---
+
+# FALLBACK BEHAVIOR
+
+If no domain pattern matches:
+
+Router MUST emit generic fallback IntentFrame:
+
+IntentFrame {
+  domain: "generic"
+  operator_name: "GENERIC_COMPILE"
+  slots: { "raw_text": original_input }
+  confidence: 0.0
+  source_pattern_id: "fallback.generic"
+  fallback: true
+}
+
+Compiler then uses existing generic compilation behavior.
+
+---
+
+# SLOT FILLING RULES
+
+slot_filler.py extracts required slots from tokens.
+
+Initial V1 slot rules:
+
+Pattern:
+  "capital of X"
+Slot:
+  region = X
+
+Pattern:
+  "simplify X"
+Slot:
+  expression = X
+
+Pattern:
+  "calculate acceleration from force X and mass Y"
+Slots:
+  force = X
+  mass = Y
+
+Pattern:
+  "find first X in Y"
+Slots:
+  predicate = X
+  collection = Y
+
+Rules:
+1. Slot filling MUST be deterministic.
+2. Slot filling MUST NOT infer unstated facts.
+3. Slot filling MUST preserve raw token values.
+4. Slot filling MAY normalize whitespace/case.
+5. Slot filling MUST fail cleanly if required slot unavailable.
+
+---
+
+# DOMAIN BINDING REQUIREMENTS
+
+Each domain compiler_bindings.py MAY register patterns.
+
+Required function:
+
+register_patterns(registry)
+
+The router must not hardcode all domain rules internally.
+
+The router may include minimal generic fallback rules only.
+
+---
+
+# HARD RULES
+
+1. Router MUST be deterministic.
+2. Router MUST NOT modify CDL semantics.
+3. Router MUST NOT auto-register operators.
+4. Router MUST NOT execute operators.
+5. Router MUST NOT call MECP.
+6. Router MUST NOT mutate DiscourseState.
+7. Router MUST fall back to generic compilation if no match exists.
+8. Router MUST preserve ambiguous matches.
+9. Router MUST select one deterministic primary intent.
+10. Router MUST only use registered domain patterns.
+11. Router MUST not create new domain operators.
+12. Router MUST not bypass compiler.
+
+---
+
+# FAILURE RULES
+
+INVALID if router:
+- creates operators
+- changes CDL TypeSignature
+- runs execution
+- prunes alternatives without recording them
+- uses randomness
+- silently drops ambiguity
+- requires external services
+- modifies domain modules at runtime
+
+---
+
+# IMPLEMENTATION PRIORITY
+
+1. core/router/intent.py
+2. core/router/patterns.py
+3. core/router/slot_filler.py
+4. core/router/dispatcher.py
+5. core/router/__init__.py
+6. core/router/tests.py
+7. update domain compiler_bindings.py files to expose register_patterns(registry)
+8. update compiler entry point to accept IntentFrame or RouteResult
+
+---
+
+# INITIAL VALIDATION EXAMPLES
+
+Example 1:
+Input:
+  "capital of France"
+
+Expected:
+  domain = geography
+  operator = CAPITAL_OF
+  slots = { region: "France" }
+  fallback = false
+
+---
+
+Example 2:
+Input:
+  "simplify x + 0"
+
+Expected:
+  domain = math
+  operator = SIMPLIFY
+  slots = { expression: "x + 0" }
+  fallback = false
+
+---
+
+Example 3:
+Input:
+  "calculate acceleration from force 10 N and mass 2 kg"
+
+Expected:
+  domain = physics
+  operator = COMPUTE_ACCELERATION
+  slots = { force: "10 N", mass: "2 kg" }
+  fallback = false
+
+---
+
+Example 4:
+Input:
+  "find first even number in [3,5,8]"
+
+Expected:
+  domain = programming
+  operator = FIND_FIRST or ITERATE
+  slots = { predicate: "even number", collection: "[3,5,8]" }
+  fallback = false
+
+---
+
+Example 5:
+Input:
+  "unknown phrase with no registered pattern"
+
+Expected:
+  domain = generic
+  operator = GENERIC_COMPILE
+  fallback = true
+
+---
+
+# TRACE REQUIREMENTS
+
+Router trace MUST include:
+
+RouteTrace {
+  input_text
+  matched_patterns
+  rejected_patterns
+  slot_bindings
+  confidence_scores
+  selected_intent
+  ambiguous
+  fallback_used
+}
+
+---
+
+# DESIGN INTENT
+
+The router is not an intelligence layer.
+
+It is a deterministic bridge:
+
+ParsedInput
+→ domain/operator intent
+→ compiler-ready semantic routing
+
+It exists so natural-language queries can reach the correct domain operators without corrupting parser, CDL, compiler, MECP, or discourse boundaries.
+
+---
+
+# END OF SPEC

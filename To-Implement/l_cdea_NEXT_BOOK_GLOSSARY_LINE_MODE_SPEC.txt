@@ -1,0 +1,271 @@
+PROJECT: L-CDEA
+MODULE: ingestion/book_prep/glossary_line_mode/
+
+PURPOSE:
+Enable book ingestion to correctly handle glossary-style chapters (short, line-based definitions and relationships) by dynamically switching from paragraph chunking to dictionary-style line chunking within those sections.
+
+Current problem:
+Book mode uses paragraph chunking. Chapters with many short lines like:
+  "Velocity is displacement over time."
+are either:
+  - merged into large chunks (losing extraction precision), or
+  - filtered out (below min length)
+
+Result:
+Definitions and relationships are missed even though content is valid.
+
+---
+
+# POSITION IN PIPELINE
+
+Book Input
+→ Book Parser (chapters)
+→ Section Chunking (THIS MODULE DECIDES MODE)
+→ Extraction
+→ Validation
+→ DiscourseState
+
+---
+
+# DIRECTORY IMPACT
+
+Modify:
+
+l_cdea/ingestion/book_prep/loader.py
+l_cdea/ingestion/book_prep/parser.py (optional signal)
+l_cdea/ingestion/document_scaling/chunker.py
+l_cdea/ingestion/modes/filter.py (reuse dictionary validation)
+
+Add:
+
+l_cdea/ingestion/book_prep/glossary_detector.py
+l_cdea/ingestion/book_prep/tests_glossary_mode.py
+
+---
+
+# CORE IDEA
+
+Each chapter is classified as:
+
+1. paragraph_mode (default)
+2. glossary_line_mode (new)
+
+Mode selection is deterministic and per-chapter.
+
+---
+
+# GLOSSARY DETECTION
+
+glossary_detector.py:
+
+detect_glossary_mode(chapter_text) -> bool
+
+Rules (all deterministic):
+
+Let:
+  total_lines = non-empty lines
+  valid_lines = lines passing dictionary filter
+
+Conditions:
+
+1. valid_lines ≥ 3
+2. valid_lines / total_lines ≥ 0.5
+3. average line length ≤ 120 chars
+4. at least 2 lines match definition patterns:
+     "X is Y"
+     "X is the ..."
+     "X depends on Y"
+
+If all true → glossary_line_mode = True
+
+Else → paragraph_mode
+
+---
+
+# CHUNKING BEHAVIOR
+
+If glossary_line_mode:
+
+1. split by single newline
+2. skip blank lines
+3. validate each line with:
+   is_valid_dictionary_chunk()
+4. each line becomes a chunk:
+   - paragraph_index = line index
+   - location = "chapter:<id>:line:<n>"
+5. chunk_id = make_chunk_id(source_path, "book_glossary", location, text)
+
+If paragraph_mode:
+
+→ use existing structured document chunker unchanged
+
+---
+
+# METADATA
+
+Each chunk MUST include:
+
+{
+  "book_id": <book_id>
+  "chapter_id": <chapter_id>
+  "chunk_mode": "glossary_line" | "paragraph"
+  "line_index": <int> (if glossary mode)
+  "section_id": <section_id> (if paragraph mode)
+}
+
+---
+
+# PROVENANCE
+
+Provenance MUST include:
+
+source_path
+book_id
+chapter_id
+chunk_id
+location
+extraction_method
+confidence
+trace_id
+
+---
+
+# EXTRACTION IMPACT
+
+Glossary mode SHOULD:
+
+1. increase definition recall
+2. increase relationship extraction precision
+3. reduce noise from unrelated paragraph text
+
+No changes to extraction logic itself.
+
+---
+
+# TRACE
+
+Add:
+
+GlossaryModeTrace {
+  chapter_id
+  glossary_mode: bool
+  total_lines
+  valid_lines
+  ratio
+}
+
+Included in BookIngestionTrace.
+
+---
+
+# HARD RULES
+
+1. Detection MUST be deterministic.
+2. No ML or heuristics beyond defined rules.
+3. Paragraph mode MUST remain unchanged.
+4. Dictionary validation MUST be reused (no duplication).
+5. Chunk IDs MUST remain stable across runs.
+6. No duplication of nodes or edges.
+7. Provenance MUST remain intact.
+8. Mode selection MUST NOT depend on runtime state.
+9. Must work on mixed books (some chapters glossary, some not).
+10. Must not degrade structured document ingestion.
+
+---
+
+# VALIDATION EXAMPLES
+
+Example 1 — glossary chapter:
+
+Input:
+
+Chapter 1
+
+Velocity is displacement over time.
+Acceleration is the rate of change of velocity.
+Force is mass times acceleration.
+
+Expected:
+  glossary_mode=True
+  3 chunks
+  3 definitions extracted
+  relationships extracted
+
+---
+
+Example 2 — paragraph chapter:
+
+Input:
+
+Chapter 2
+
+Velocity describes how quickly an object moves. It is defined as displacement over time...
+
+Expected:
+  glossary_mode=False
+  paragraph chunking used
+
+---
+
+Example 3 — mixed book:
+
+Chapter 1 → glossary
+Chapter 2 → paragraph
+
+Expected:
+  per-chapter mode switching works correctly
+
+---
+
+Example 4 — regression:
+
+Existing dictionary mode ingestion:
+  unchanged
+
+Existing structured document ingestion:
+  unchanged
+
+---
+
+# IMPLEMENTATION PRIORITY
+
+1. glossary_detector.py
+2. integrate into loader.py (per chapter)
+3. reuse dictionary filter
+4. modify chunking branch
+5. add metadata fields
+6. add trace output
+7. tests_glossary_mode.py
+8. run full ingestion regression
+
+---
+
+# SUCCESS CRITERIA
+
+Given glossary-style Chapter 1:
+
+- velocity, force, acceleration all become definition nodes
+- relationships extracted correctly
+- queries:
+    what is velocity
+    what does force depend on
+    what does force indirectly depend on
+
+all return correct results
+
+---
+
+# DESIGN INTENT
+
+Allow book ingestion to adapt to content style without sacrificing determinism.
+
+This ensures:
+  glossary-style textbooks work
+  structured textbooks work
+  hybrid books work
+
+without requiring manual preprocessing.
+
+---
+
+# END OF SPEC

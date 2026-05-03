@@ -1,0 +1,9 @@
+Acceleration is the rate of change of velocity.
+
+Force is defined as mass times acceleration.
+
+Velocity is displacement over time.
+
+Mass is a measure of the amount of matter in an object.
+
+The formula for force is F = m * a.

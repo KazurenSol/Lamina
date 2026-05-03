@@ -1,0 +1,303 @@
+PROJECT: L-CDEA
+MODULE: ingestion/router/
+
+PURPOSE:
+Provide a deterministic ingestion routing layer that classifies document text into semantic categories and dispatches each chunk to the correct extractor.
+
+This is the bridge between raw text ingestion and structured knowledge extraction.
+
+Input:
+  raw text / document chunks
+
+Output:
+  structured IngestionRoute objects directing each chunk to:
+    - definition extractor
+    - claim extractor
+    - procedure extractor
+    - example extractor
+    - formula extractor
+
+---
+
+# POSITION IN PIPELINE
+
+Document Input
+→ Chunking (external or prior module)
+→ Ingestion Router (THIS MODULE)
+→ Extractors (definition / claim / procedure / example / formula)
+→ Validation
+→ DiscourseState
+→ Persistence
+
+---
+
+# DIRECTORY STRUCTURE
+
+l_cdea/ingestion/router/
+├── __init__.py
+├── route.py
+├── patterns.py
+├── classifier.py
+├── dispatcher.py
+├── trace.py
+└── tests.py
+
+---
+
+# CORE TYPES
+
+IngestionRoute {
+  route_id: str
+  chunk_text: str
+  category: str  # "definition" | "claim" | "procedure" | "example" | "formula" | "unknown"
+  confidence: float
+  matched_patterns: Tuple[str, ...]
+  fallback: bool
+}
+
+IngestionRouteResult {
+  routes: Tuple[IngestionRoute, ...]
+  ambiguous: bool
+}
+
+---
+
+# CATEGORY DEFINITIONS
+
+definition:
+  describes what something is
+
+claim:
+  states a fact or relationship
+
+procedure:
+  describes a process or steps
+
+example:
+  demonstrates usage or instance
+
+formula:
+  mathematical or symbolic expression
+
+unknown:
+  fallback category
+
+---
+
+# CLASSIFICATION RULES
+
+Classification MUST be deterministic.
+
+No ML models.
+No external APIs.
+No randomness.
+
+Based on:
+
+1. keyword patterns
+2. structural patterns
+3. punctuation patterns
+4. formatting cues
+
+---
+
+# PATTERN MATCHING
+
+patterns.py defines PatternRule:
+
+PatternRule {
+  id: str
+  category: str
+  keywords: Tuple[str, ...]
+  structure: Optional[str]
+  priority: int
+}
+
+Example patterns:
+
+Definition:
+  keywords: ("is defined as", "refers to", "is a", "means")
+
+Claim:
+  keywords: ("is", "are", "has", "causes", "results in")
+
+Procedure:
+  keywords: ("step", "first", "then", "next", "finally")
+
+Example:
+  keywords: ("for example", "e.g.", "such as")
+
+Formula:
+  structure: contains "=" or math operators (+, -, *, ^)
+
+---
+
+# CLASSIFIER LOGIC
+
+classifier.py:
+
+classify_chunk(text):
+
+1. normalize text (lowercase, strip)
+2. match all PatternRules
+3. compute deterministic score:
+     score = keyword_hits + priority
+4. select highest-scoring category
+5. if tie:
+     mark ambiguous = True
+     select deterministically (lexicographic rule)
+6. if no match:
+     category = "unknown"
+     fallback = True
+
+---
+
+# DISPATCHER
+
+dispatcher.py:
+
+dispatch(routes):
+
+For each route:
+  if category == definition:
+    send to definition extractor
+  if category == claim:
+    send to claim extractor
+  if category == procedure:
+    send to procedure extractor
+  if category == example:
+    send to example extractor
+  if category == formula:
+    send to formula extractor
+  if category == unknown:
+    send to generic extractor or skip
+
+Dispatcher MUST NOT perform extraction itself.
+
+---
+
+# FORMULA DETECTION RULES
+
+A chunk is a formula if:
+
+1. contains "="
+2. contains math symbols (+, -, *, /, ^)
+3. or matches math expression grammar
+
+Example:
+  "F = ma"
+  "x^2 + 2x + 1"
+
+These MUST route to formula extractor.
+
+---
+
+# HARD RULES
+
+1. Ingestion router MUST be deterministic.
+2. Router MUST NOT perform extraction.
+3. Router MUST NOT modify DiscourseState.
+4. Router MUST NOT call planner or execution.
+5. Router MUST preserve raw chunk text.
+6. Router MUST provide traceable decisions.
+7. Router MUST handle ambiguous classification.
+8. Router MUST include fallback path.
+
+---
+
+# TRACE REQUIREMENTS
+
+trace.py MUST record:
+
+IngestionRouteTrace {
+  chunk_text
+  matched_patterns
+  selected_category
+  confidence
+  ambiguous
+  fallback
+}
+
+---
+
+# VALIDATION EXAMPLES
+
+Example 1:
+Input:
+  "Acceleration is defined as the rate of change of velocity."
+
+Expected:
+  category = definition
+
+---
+
+Example 2:
+Input:
+  "Force equals mass times acceleration."
+
+Expected:
+  category = claim OR formula (depending on "=" presence)
+
+---
+
+Example 3:
+Input:
+  "First, heat the mixture. Then add water."
+
+Expected:
+  category = procedure
+
+---
+
+Example 4:
+Input:
+  "For example, Paris is the capital of France."
+
+Expected:
+  category = example
+
+---
+
+Example 5:
+Input:
+  "F = ma"
+
+Expected:
+  category = formula
+
+---
+
+Example 6:
+Input:
+  "Random sentence without structure."
+
+Expected:
+  category = unknown
+  fallback = True
+
+---
+
+# IMPLEMENTATION PRIORITY
+
+1. ingestion/router/patterns.py
+2. ingestion/router/classifier.py
+3. ingestion/router/route.py
+4. ingestion/router/dispatcher.py
+5. ingestion/router/trace.py
+6. ingestion/router/tests.py
+
+---
+
+# DESIGN INTENT
+
+The ingestion router is a deterministic classifier.
+
+It converts raw text into structured routing decisions.
+
+It does NOT extract knowledge.
+It does NOT validate truth.
+It only directs flow.
+
+---
+
+# END OF SPEC

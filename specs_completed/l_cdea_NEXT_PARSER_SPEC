@@ -1,0 +1,207 @@
+PROJECT: L-CDEA (Lamina CDL–Discourse Execution Architecture)
+MODULE: core/parser/
+
+STATUS: core/cdl/ COMPLETE (verified + deterministic execution enforced)
+
+---
+
+# PURPOSE OF THIS MODULE
+
+The parser is the **first semantic boundary layer**.
+
+It converts raw input text into:
+
+1. token stream
+2. structured lexical units
+3. pre-semantic candidate frames
+
+It MUST NOT:
+- assign final meaning
+- resolve full types
+- construct CDL graphs
+- invoke MECP
+- access DiscourseState
+
+It ONLY prepares structured input for the compiler.
+
+---
+
+# POSITION IN PIPELINE
+
+Input →
+Parser →
+Type Resolution →
+CDL Compiler →
+CAS →
+MECP →
+Executor →
+DiscourseState →
+Trace
+
+---
+
+# HARD INVARIANTS
+
+1. Parser is stateless
+2. Parser is deterministic
+3. Parser produces NO semantic commitments
+4. Parser cannot prune interpretations
+5. Parser cannot rank meanings (no MECP influence)
+
+---
+
+# DIRECTORY STRUCTURE
+
+l_cdea/core/parser/
+│
+├── __init__.py
+├── tokenizer.py
+├── lexer.py
+├── structure.py
+├── presemantic.py
+└── exceptions.py
+
+---
+
+# 1. tokenizer.py
+
+PURPOSE:
+Convert raw text → tokens
+
+RULES:
+- no interpretation
+- no normalization beyond character-level structure
+- deterministic splitting only
+
+OUTPUT:
+TokenStream
+
+---
+
+# 2. lexer.py
+
+PURPOSE:
+Convert tokens → lexical units
+
+RULES:
+- identifies word boundaries
+- preserves ambiguity (NO disambiguation allowed)
+- tags raw lexical forms only
+
+OUTPUT:
+LexicalUnit[]
+
+---
+
+# 3. structure.py
+
+PURPOSE:
+Build syntactic skeleton
+
+RULES:
+- identifies structural relations (not meaning)
+- detects grouping (phrases, clauses)
+- does NOT assign semantic roles
+
+OUTPUT:
+StructureTree
+
+---
+
+# 4. presemantic.py
+
+PURPOSE:
+Generate candidate meaning frames WITHOUT selection
+
+RULES:
+- generate ALL plausible interpretations (top-k later handled by MECP)
+- do NOT prune candidates
+- do NOT rank candidates
+- output must remain unordered
+
+OUTPUT:
+PreSemanticFrameSet
+
+---
+
+# 5. exceptions.py
+
+DEFINE:
+
+class ParserError(Exception):
+    pass
+
+class TokenizationError(ParserError):
+    pass
+
+class LexingError(ParserError):
+    pass
+
+class StructureError(ParserError):
+    pass
+
+---
+
+# OUTPUT CONTRACT
+
+Parser MUST return:
+
+ParsedInput {
+    tokens: TokenStream,
+    lexical_units: List[LexicalUnit],
+    structure: StructureTree,
+    presemantic_frames: Set[PreSemanticFrame]
+}
+
+---
+
+# CRITICAL DESIGN RULES
+
+## 1. No semantics allowed
+Parser must not infer meaning.
+
+## 2. No ranking allowed
+No scoring, no confidence values.
+
+## 3. No MECP interaction
+Parser must produce FULL candidate space.
+
+## 4. Deterministic output required
+Same input → identical parsed structure.
+
+---
+
+# DESIGN INTENT (IMPORTANT)
+
+This module exists to:
+
+> maximize downstream interpretability WITHOUT committing to interpretation
+
+It is a **lossless ambiguity-preserving transformation layer**.
+
+---
+
+# FAILURE MODE PREVENTION
+
+If parser:
+- selects meanings → INVALID
+- prunes candidates → INVALID
+- introduces probabilities → INVALID
+- calls type system for resolution → INVALID
+
+---
+
+# NEXT MODULE
+
+After completion, proceed to:
+
+core/compiler/
+
+Which will:
+- map presemantic frames → typed CDL graphs
+- introduce initial interpretation constraints
+- prepare input for CAS and MECP layers
+
+---
+
+END OF SPEC

@@ -1,0 +1,230 @@
+PROJECT: L-CDEA
+MODULE: discourse/
+
+STATUS:
+execution/ COMPLETE
+Input: ExecutionBundle
+Output: Updated DiscourseState + MemoryGraph snapshot
+
+---
+
+# PURPOSE
+
+The discourse layer is the persistent semantic memory system.
+
+It stores executed, canonicalized semantic results as a typed memory graph.
+
+It MUST NOT:
+- compile language
+- execute CDL
+- rerun MECP
+- mutate CDL operators
+- reinterpret semantics
+
+---
+
+# POSITION IN PIPELINE
+
+Input
+→ Parser
+→ Compiler
+→ CAS
+→ MECP
+→ Execution
+→ DiscourseState
+→ Trace Logger
+
+---
+
+# DIRECTORY STRUCTURE
+
+l_cdea/discourse/
+├── __init__.py
+├── state.py
+├── node.py
+├── edge.py
+├── salience.py
+├── temporal.py
+├── importer.py
+├── memory_graph.py
+└── exceptions.py
+
+---
+
+# CORE OBJECTS
+
+DiscourseNode {
+  id
+  semantic_type
+  value
+  salience
+  created_at
+  updated_at
+}
+
+DiscourseEdge {
+  source_id
+  target_id
+  relation_type
+  salience
+}
+
+DiscourseState {
+  nodes
+  edges
+  temporal_index
+  salience_index
+}
+
+---
+
+# HARD INVARIANTS
+
+1. Discourse updates happen ONLY after execution completes.
+2. Only executed results may enter DiscourseState.
+3. Intermediate compiler graphs MUST NOT persist.
+4. MECP-pruned branches MUST NOT persist.
+5. Discourse MUST store canonical semantic structures only.
+6. Discourse MUST NOT modify CDL semantics.
+7. Discourse MUST be deterministic given identical ExecutionBundle + state.
+8. Salience may affect memory retrieval/order, but not semantic truth.
+
+---
+
+# MODULE RESPONSIBILITIES
+
+## node.py
+Defines DiscourseNode.
+
+## edge.py
+Defines DiscourseEdge.
+
+## state.py
+Defines DiscourseState container.
+
+## salience.py
+Handles salience update and decay.
+
+Rules:
+- salience is deterministic
+- salience may decay over time/index
+- salience must not delete semantic truth immediately
+
+## temporal.py
+Maintains ordered semantic history.
+
+## importer.py
+Imports ExecutionBundle into DiscourseState.
+
+Rules:
+- only imports successful execution results
+- failed graph results are recorded only as failure metadata if needed
+- no semantic reinterpretation
+
+## memory_graph.py
+Provides graph access:
+- add node
+- add edge
+- lookup node
+- lookup relation
+- merge duplicate canonical structures
+
+---
+
+# SALIENCE MODEL V1
+
+salience_new = base_salience + reinforcement
+
+decay:
+salience(t+1) = salience(t) * decay_factor
+
+Rules:
+- decay_factor must be deterministic
+- no random salience shifts
+- salience never changes CDL meaning
+
+---
+
+# DUPLICATE MERGE RULE
+
+If a new result has the same canonical signature as an existing node:
+
+1. Do not create duplicate semantic node
+2. Reinforce salience of existing node
+3. Append temporal reference
+4. Preserve provenance/reference to execution trace
+
+---
+
+# OUTPUT CONTRACT
+
+Discourse update MUST return:
+
+DiscourseUpdateResult {
+  state
+  added_nodes
+  added_edges
+  reinforced_nodes
+  temporal_events
+}
+
+---
+
+# FAILURE RULES
+
+INVALID if discourse:
+- stores raw parser tokens as truth
+- stores unexecuted CDL graphs
+- stores MECP-pruned branches
+- alters CDL operators
+- reruns compiler/MECP/execution
+- performs probabilistic rewriting
+
+---
+
+# INITIAL VALIDATION CASES
+
+Case 1:
+Execution result:
+  LOCATED_IN(Paris, France)
+
+Expected discourse:
+  Entity: Paris
+  Entity: France
+  Relation: LOCATED_IN(Paris, France)
+
+Case 2:
+Same result repeated.
+
+Expected:
+  no duplicate relation
+  salience reinforced
+  temporal index updated
+
+Case 3:
+Failed execution graph.
+
+Expected:
+  failure recorded separately
+  no semantic truth node created
+
+---
+
+# NEXT MODULE
+
+After discourse, proceed to:
+
+trace_logger/
+
+Trace logger will record:
+- input
+- parser output
+- compiler graphs
+- CAS signatures
+- MECP decisions
+- execution results
+- discourse updates
+
+---
+
+# END OF SPEC

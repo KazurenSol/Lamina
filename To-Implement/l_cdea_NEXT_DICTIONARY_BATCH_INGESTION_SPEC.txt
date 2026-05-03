@@ -1,0 +1,275 @@
+PROJECT: L-CDEA
+MODULE: ingestion/batch/
+
+PURPOSE:
+Enable safe, deterministic ingestion of multiple dictionary/glossary files with per-file isolation, aggregated reporting, and robust failure handling.
+
+This allows scaling from single-file ingestion to controlled batch ingestion without corrupting DiscourseState.
+
+---
+
+# POSITION IN PIPELINE
+
+Batch Input (directory / file list)
+→ Per-file ingestion (dictionary mode)
+→ Validation + Provenance
+→ DiscourseState (incremental updates)
+→ Persistence (per file or batched)
+→ Batch Summary Report
+
+---
+
+# DIRECTORY STRUCTURE
+
+l_cdea/ingestion/batch/
+├── __init__.py
+├── batch.py
+├── report.py
+├── config.py
+├── errors.py
+└── tests.py
+
+---
+
+# CORE TYPES
+
+BatchIngestionConfig {
+  mode: str  # "dictionary"
+  state_path: str
+  stop_on_error: bool
+  save_per_file: bool
+  max_files: Optional[int]
+}
+
+BatchFileResult {
+  file_path: str
+  success: bool
+  ingestion_result: Optional[IngestionResult]
+  error: Optional[str]
+  duration_ms: int
+}
+
+BatchIngestionReport {
+  total_files: int
+  processed_files: int
+  successful_files: int
+  failed_files: int
+  total_chunks: int
+  total_definitions: int
+  total_nodes_added: int
+  total_contradictions: int
+  file_results: Tuple[BatchFileResult, ...]
+}
+
+---
+
+# ENTRYPOINT
+
+batch_ingest_directory(path, config) -> BatchIngestionReport
+
+Behavior:
+
+1. list files in directory (sorted deterministically)
+2. optionally limit by max_files
+3. process each file independently
+4. accumulate results
+5. return aggregated report
+
+---
+
+# FILE PROCESSING RULE
+
+For each file:
+
+1. call ingest_document(file, mode="dictionary", state_path=config.state_path)
+2. capture IngestionResult
+3. measure duration
+4. update totals
+
+If error occurs:
+
+- record failure in BatchFileResult
+- if stop_on_error:
+    abort batch
+- else:
+    continue
+
+---
+
+# PERSISTENCE RULES
+
+Two modes:
+
+## save_per_file = True (default)
+
+After each file:
+  state is saved immediately
+
+Pros:
+  crash-safe
+Cons:
+  slightly slower
+
+## save_per_file = False
+
+Accumulate all changes in memory
+Save once at end
+
+Pros:
+  faster
+Cons:
+  crash risk
+
+---
+
+# DETERMINISM RULES
+
+1. Files MUST be processed in sorted order
+2. No parallel execution in V1
+3. No randomness
+4. Same directory → same report
+
+---
+
+# ERROR HANDLING
+
+errors.py defines:
+
+BatchIngestionError
+FileIngestionError
+
+Rules:
+
+1. File errors MUST NOT crash entire batch (unless stop_on_error=True)
+2. Corrupt file → record error, skip
+3. Missing file → record error
+4. Partial ingestion MUST NOT corrupt state
+
+---
+
+# REPORTING
+
+report.py:
+
+generate_report(file_results)
+
+Aggregates:
+
+- total_chunks
+- total_definitions
+- total_nodes_added
+- total_contradictions
+
+Also includes per-file breakdown.
+
+---
+
+# TRACE REQUIREMENTS
+
+BatchTrace {
+  directory_path
+  files_processed
+  files_failed
+  total_time_ms
+}
+
+Optional per-file trace:
+
+BatchFileTrace {
+  file_path
+  chunks_processed
+  definitions
+  nodes_added
+  duration_ms
+}
+
+---
+
+# CLI INTEGRATION (OPTIONAL)
+
+Add command:
+
+python3 -m l_cdea.batch_ingest /path/to/dictionary_dir
+
+Flags:
+
+--state-path PATH
+--stop-on-error
+--no-save-per-file
+--max-files N
+
+---
+
+# HARD RULES
+
+1. Batch ingestion MUST be deterministic.
+2. Each file MUST be isolated.
+3. Errors MUST NOT corrupt DiscourseState.
+4. Provenance MUST include source_path per file.
+5. Dictionary mode MUST be used.
+6. No parallelism in V1.
+7. Persistence MUST follow config rules.
+8. Reporting MUST be accurate.
+9. IngestionResult semantics MUST remain unchanged.
+10. System MUST remain queryable during/after batch ingestion.
+
+---
+
+# VALIDATION EXAMPLES
+
+Example 1 — directory with 3 files:
+
+Expected:
+  total_files=3
+  processed_files=3
+  successful_files=3
+  failed_files=0
+
+---
+
+Example 2 — one bad file:
+
+Expected:
+  failed_files=1
+  remaining files processed
+
+---
+
+Example 3 — stop_on_error=True:
+
+Expected:
+  batch stops on first failure
+
+---
+
+Example 4 — deterministic order:
+
+Same directory run twice → identical report
+
+---
+
+# IMPLEMENTATION PRIORITY
+
+1. ingestion/batch/config.py
+2. ingestion/batch/batch.py
+3. ingestion/batch/report.py
+4. ingestion/batch/errors.py
+5. ingestion/batch/tests.py
+6. optional CLI entrypoint
+7. integration test with multiple dictionary files
+
+---
+
+# DESIGN INTENT
+
+Batch ingestion must be:
+
+- safe
+- deterministic
+- observable
+
+This enables scaling from small manual ingestion to structured knowledge loading.
+
+---
+
+# END OF SPEC

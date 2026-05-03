@@ -1,0 +1,347 @@
+PROJECT: L-CDEA
+MODULE: domain/physics/
+
+PURPOSE:
+Provide a high-fidelity domain pack for modeling physical systems, causal interactions, and continuous-to-discrete transformations using CDL-compatible typed operator graphs.
+
+---
+
+# DOMAIN ROLE
+
+Physics Domain V1 is used to test and extend:
+
+1. Multi-step causal reasoning
+2. Continuous quantity handling (discretized in CDL)
+3. Operator chaining across dependencies
+4. CAS equivalence under algebraic/physical identities
+5. MECP selection under competing solution paths
+6. Execution correctness with dimensional consistency
+
+This domain maps physical concepts into CDL graphs without changing CDL semantics.
+
+---
+
+# DIRECTORY STRUCTURE
+
+l_cdea/domain/physics/
+├── __init__.py
+├── operators.py
+├── types.py
+├── units.py
+├── constraints.py
+├── equivalence_rules.py
+├── compiler_bindings.py
+├── patterns.py
+├── examples.py
+└── tests.py
+
+---
+
+# PHYSICS DOMAIN TYPES (mapped to core)
+
+Quantity
+  maps_to: Entity
+
+Vector
+  maps_to: Entity
+
+Scalar
+  maps_to: Entity
+
+Force
+  maps_to: Entity
+
+Mass
+  maps_to: Entity
+
+Velocity
+  maps_to: Entity
+
+Acceleration
+  maps_to: Process
+
+Energy
+  maps_to: Entity
+
+System
+  maps_to: Entity
+
+Interaction
+  maps_to: Event
+
+Field
+  maps_to: Abstraction
+
+Constraint (e.g., conservation law)
+  maps_to: Constraint
+
+State (position, velocity at time t)
+  maps_to: State
+
+---
+
+# UNITS SYSTEM (MANDATORY)
+
+All quantities MUST carry units.
+
+Example:
+
+Quantity {
+  value: 10
+  unit: m/s
+  type: Velocity
+}
+
+RULES:
+1. All operators MUST enforce unit compatibility
+2. Unit conversion MUST be explicit (CONVERT_UNITS operator)
+3. Dimensionally invalid operations MUST raise errors
+
+---
+
+# PHYSICS OPERATORS V1
+
+# Core mechanics
+
+APPLY_FORCE(system, force) -> State
+COMPUTE_ACCELERATION(force, mass) -> Acceleration
+UPDATE_VELOCITY(velocity, acceleration, time) -> Velocity
+UPDATE_POSITION(position, velocity, time) -> State
+
+# Energy
+
+COMPUTE_KINETIC_ENERGY(mass, velocity) -> Energy
+COMPUTE_POTENTIAL_ENERGY(mass, height, gravity) -> Energy
+CONSERVE_ENERGY(system) -> Constraint
+
+# Motion
+
+INTEGRATE_MOTION(state, time_interval) -> State
+COMPUTE_TRAJECTORY(initial_state, forces, duration) -> Process
+
+# Interaction
+
+DETECT_COLLISION(bodyA, bodyB) -> Event
+RESOLVE_COLLISION(bodyA, bodyB) -> State
+
+# Field interactions
+
+APPLY_FIELD_EFFECT(field, particle) -> State
+
+# Measurement
+
+MEASURE(quantity) -> Scalar
+COMPARE_QUANTITIES(q1, q2) -> Constraint
+
+# Unit handling
+
+CONVERT_UNITS(quantity, target_unit) -> Quantity
+
+---
+
+# REQUIRED CORE OPERATOR MAPPINGS
+
+Physics operators MUST reduce to core operators where possible.
+
+COMPUTE_ACCELERATION
+= TRANSFORM(force / mass)
+
+UPDATE_VELOCITY
+= TRANSFORM(velocity + acceleration * time)
+
+UPDATE_POSITION
+= TRANSFORM(position + velocity * time)
+
+COMPUTE_KINETIC_ENERGY
+= TRANSFORM(0.5 * mass * velocity^2)
+
+CONSERVE_ENERGY
+= VALIDATE(total_energy_before == total_energy_after)
+
+DETECT_COLLISION
+= MATCH(spatial_overlap(bodyA, bodyB))
+
+---
+
+# CANONICALIZATION RULES
+
+CAS MUST recognize algebraic and physical equivalence.
+
+Examples:
+
+F = m * a
+is equivalent to:
+a = F / m
+
+KE = 0.5 * m * v^2
+is equivalent under variable renaming:
+E_k = 1/2 * mass * velocity^2
+
+Motion update:
+position = position + velocity * time
+is equivalent to:
+INTEGRATE(position, velocity, time)
+
+Multiple-step integration chains that collapse to same final state
+MUST be recognized as equivalent if intermediate states are not observed.
+
+---
+
+# MECP STRESS CASES
+
+Example 1:
+Task:
+  "Find final velocity after applying constant force"
+
+Possible graphs:
+  G1: compute acceleration then update velocity
+  G2: integrate motion directly
+  G3: simulate step-by-step loop
+
+Expected MECP preference:
+  G1 or G2 (minimal cost, sufficient accuracy)
+
+---
+
+Example 2:
+Task:
+  "Compute trajectory of a falling object"
+
+Possible graphs:
+  G1: analytic formula
+  G2: numerical integration (loop)
+  G3: simulation with small time steps
+
+Expected MECP preference:
+  G1 if available, otherwise G2
+
+---
+
+Example 3:
+Task:
+  "Check if energy is conserved"
+
+Possible graphs:
+  G1: direct energy comparison
+  G2: simulate system and compare totals
+  G3: derive symbolic conservation law
+
+Expected MECP preference:
+  G1
+
+---
+
+# EXECUTION RULES
+
+1. All physics operators MUST be deterministic
+2. No implicit randomness
+3. Time must be explicit input (no hidden global clock)
+4. All calculations MUST be reproducible
+5. No external simulation engines in V1
+
+---
+
+# DISCOURSESTATE STORAGE RULES
+
+Physics results may be stored as:
+
+State:
+  position(t), velocity(t), energy(t)
+
+Relations:
+  FORCE_APPLIED(system, force)
+  ENERGY_CONSERVED(system)
+
+Patterns:
+  motion update chains
+  energy transformations
+
+---
+
+# OPERATOR DISCOVERY RULES
+
+System MAY propose new operators if repeated patterns emerge.
+
+Example:
+
+FREE_FALL(state, gravity, time)
+=
+UPDATE_VELOCITY + UPDATE_POSITION chain
+
+Registration requirements:
+1. Valid TypeSignature
+2. Deterministic
+3. No duplicate operator
+4. Reduces graph complexity
+5. Improves MECP efficiency
+6. Versioned
+7. Passes unit + physics validation tests
+
+---
+
+# INITIAL VALIDATION EXAMPLES
+
+Example 1:
+Input:
+  "Calculate acceleration from force and mass"
+
+Expected graph:
+  COMPUTE_ACCELERATION(force, mass)
+
+---
+
+Example 2:
+Input:
+  "Update position after 5 seconds at constant velocity"
+
+Expected graph:
+  UPDATE_POSITION(position, velocity, time)
+
+---
+
+Example 3:
+Input:
+  "Compute kinetic energy"
+
+Expected graph:
+  COMPUTE_KINETIC_ENERGY(mass, velocity)
+
+---
+
+Example 4:
+Input:
+  "Check if energy is conserved"
+
+Expected graph:
+  CONSERVE_ENERGY(system)
+
+---
+
+# HARD RULES
+
+1. Physics domain MUST NOT alter CDL semantics
+2. Physics domain MUST enforce unit consistency
+3. Physics domain MUST remain deterministic
+4. Physics domain MUST not bypass CAS
+5. Physics domain MUST not bypass MECP
+6. Physics domain MUST not use hidden simulation engines
+7. Physics domain MAY propose operators but MUST NOT auto-register
+8. Physics domain MUST include unit and constraint validation
+
+---
+
+# IMPLEMENTATION PRIORITY
+
+1. domain/physics/types.py
+2. domain/physics/units.py
+3. domain/physics/operators.py
+4. domain/physics/constraints.py
+5. domain/physics/compiler_bindings.py
+6. domain/physics/equivalence_rules.py
+7. domain/physics/patterns.py
+8. domain/physics/examples.py
+9. domain/physics/tests.py
+
+---
+
+# END OF SPEC
